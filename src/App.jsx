@@ -8,6 +8,7 @@ import SignupPage from './pages/SignupPage';
 import ReportsPage from './pages/ReportsPage';
 import TrustGraphPage from './pages/TrustGraphPage';
 import OfferCheckerPage from './pages/OfferCheckerPage';
+import SubmitReportPage from './pages/SubmitReportPage';
 import ResultsPage from './pages/ResultsPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPage from './pages/AdminPage';
@@ -34,6 +35,7 @@ function AppRoutes() {
       <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/results/:checkId" element={<ResultsPage />} />
       <Route path="/check" element={<ProtectedRoute><OfferCheckerPage /></ProtectedRoute>} />
+      <Route path="/submit" element={<ProtectedRoute><SubmitReportPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFoundPage />} />

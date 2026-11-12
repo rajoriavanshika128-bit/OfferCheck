@@ -98,9 +98,8 @@ function IdentifierDetail({ node, userRole }) {
   );
 }
 
-function ReportDetail({ node, selectedNode, secondNode, onSelectSecond, onExplain, explainResult, explainLoading }) {
+function ReportDetail({ node, _selectedNode, secondNode, onSelectSecond, onExplain, explainResult, explainLoading }) {
   const r = node.data;
-  const isFirst = selectedNode?.id === node.id;
   const hasSecond = !!secondNode;
 
   return (
@@ -203,7 +202,7 @@ export default function TrustGraphPage() {
       const pos = calculateNodePositions(data.nodes, CANVAS_W, CANVAS_H);
       setGraphData(data);
       setPositions(pos);
-    } catch (e) {
+    } catch {
       setError('Failed to load trust graph. Please try again.');
     } finally {
       setLoading(false);

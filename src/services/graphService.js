@@ -217,14 +217,18 @@ export const calculateNodePositions = (nodes, canvasWidth = 900, canvasHeight = 
     bank_account: { cx: canvasWidth * 0.5,  cy: canvasHeight * 0.15 },
   };
 
-  // Place identifier nodes
+  // Place identifier nodes — radius scales with group size to prevent overlap
   Object.entries(typeGroups).forEach(([type, group]) => {
     if (type === 'report') return;
     const center = typePositions[type] || { cx: canvasWidth * 0.5, cy: canvasHeight * 0.5 };
-    const spread = 80;
+    // Minimum 44px arc-length per node at the chosen radius avoids label collisions.
+    // For 1 node: radius 0 (placed at center). For 2+: at least 44px per node around circumference.
+    const minArcLength = 44;
+    const radius = group.length > 1
+      ? Math.max(60, (group.length * minArcLength) / (2 * Math.PI))
+      : 0;
     group.forEach((node, i) => {
       const angle = (2 * Math.PI * i) / Math.max(group.length, 1);
-      const radius = group.length > 1 ? spread : 0;
       positions[node.id] = {
         x: center.cx + radius * Math.cos(angle),
         y: center.cy + radius * Math.sin(angle),

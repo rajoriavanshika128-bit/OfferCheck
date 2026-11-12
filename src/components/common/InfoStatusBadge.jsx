@@ -6,7 +6,7 @@ const STATUS_STYLES = {
 
 export function InfoStatusBadge({ informationStatus }) {
   if (!informationStatus) return null;
-  const { isVerified, isInferred, isReported } = informationStatus;
+  const { isVerified, isInferred } = informationStatus;
   const label = isVerified ? 'Verified' : isInferred ? 'Inferred' : 'Reported';
   const style = STATUS_STYLES[label] || STATUS_STYLES.Reported;
   const tooltips = {

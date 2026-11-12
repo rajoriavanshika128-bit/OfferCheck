@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Shield, Menu, X, ChevronDown, LogOut, LayoutDashboard, User } from 'lucide-react';
+import { Shield, Menu, X, ChevronDown, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const NAV_LINKS = [

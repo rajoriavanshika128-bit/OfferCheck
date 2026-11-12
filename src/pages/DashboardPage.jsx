@@ -35,6 +35,10 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Computed once at mount — stable value, avoids react(purity) lint warning
+  const [todayLabel] = useState(() =>
+    new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  );
 
   useEffect(() => {
     getDashboardStats(user?.id)
@@ -49,7 +53,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-7">
         <h1 className="text-2xl font-bold text-[#f0ede8]">Welcome back, {user?.name?.split(' ')[0]}</h1>
-        <p className="text-sm text-[#6b6460] mt-1">{new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</p>
+        <p className="text-sm text-[#6b6460] mt-1">{todayLabel}</p>
       </div>
 
       {/* Stats row */}
@@ -129,6 +133,7 @@ export default function DashboardPage() {
             <div className="space-y-2">
               {[
                 { to: '/check', label: 'Check a new offer', icon: Search },
+                { to: '/submit', label: 'Submit a report', icon: FileText },
                 { to: '/reports', label: 'Browse all reports', icon: FileText },
                 { to: '/graph', label: 'View trust graph', icon: Shield },
               ].map(a => (

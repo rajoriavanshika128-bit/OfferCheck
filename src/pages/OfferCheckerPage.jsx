@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Search, AlertCircle, Info } from 'lucide-react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Button } from '../components/common/Button';
-import { DisclaimerBox } from '../components/common/DisclaimerBox';
 import { checkOffer } from '../services/mockApi';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -60,7 +59,7 @@ export default function OfferCheckerPage() {
     setErrors({});
     setLoading(true);
     try {
-      const result = await checkOffer({ ...form, _role: user?.role || 'student' });
+      const result = await checkOffer(form, user?.role || 'student');
       navigate(`/results/${result.checkId}`);
     } catch {
       setErrors({ general: 'An error occurred. Please try again.' });
@@ -135,7 +134,7 @@ export default function OfferCheckerPage() {
 
           <div className="flex items-center gap-2 text-xs text-[#6b6460] bg-[#161616] border border-[#2f2f2f] rounded-lg px-4 py-3">
             <Info size={13} className="text-amber-500 shrink-0" />
-            Your submission is compared against {'{70+}'} known fraud identifiers. Results are illustrative — not legal determinations.
+            Your submission is compared against 70+ known fraud identifiers. Results are illustrative — not legal determinations.
           </div>
 
           <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full justify-center">

@@ -47,7 +47,7 @@ const applyIdentifierPrivacy = (identifier, role) => {
   return { ...identifier, value: maskedValue };
 };
 
-export const checkOffer = async (formData) => {
+export const checkOffer = async (formData, role = 'student') => {
   await delay(1200);
 
   const matchedIdentifiers = [];
@@ -96,13 +96,13 @@ export const checkOffer = async (formData) => {
     riskFactors: factors,
     summary,
     disclaimer,
-    matchedIdentifiers: matchedIdentifiers.map(id => applyIdentifierPrivacy(id, formData._role || 'student')),
+    matchedIdentifiers: matchedIdentifiers.map(id => applyIdentifierPrivacy(id, role)),
     connectedReports: connectedReports.map(r => ({
       id: r.id, title: r.title, riskScore: r.riskScore,
       riskCategory: r.riskCategory, status: r.status,
       companyName: r.companyName, informationStatus: r.informationStatus,
     })),
-    sharedIdentifiers: matchedIdentifiers.map(id => ({ ...applyIdentifierPrivacy(id, formData._role || 'student'), sharedCount: id.reportIds.length })),
+    sharedIdentifiers: matchedIdentifiers.map(id => ({ ...applyIdentifierPrivacy(id, role), sharedCount: id.reportIds.length })),
   };
 
   const existing = JSON.parse(sessionStorage.getItem('offercheck_results') || '{}');

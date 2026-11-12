@@ -42,8 +42,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('offercheck_user');
   };
 
-  const signup = async (name, email, password) => {
-    // Demo only: creates an in-memory session user, not persisted
+  const signup = async (name, email, _password) => {
+    // Demo only: creates an in-memory session user, not persisted.
+    // _password is accepted for API compatibility but intentionally unused —
+    // the demo does not store or validate passwords for new signups.
     if (DEMO_USERS.some(u => u.email.toLowerCase() === email.toLowerCase())) {
       throw new Error('This email is already registered. Try logging in instead.');
     }

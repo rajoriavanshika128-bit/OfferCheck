@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import {
   Upload, Fingerprint, GitMerge, Network, BarChart3,
   Search, Shield, AlertTriangle, CheckCircle, Info,
-  CreditCard, Phone, Mail, Globe, FileText, Clock
+  CreditCard, Globe, FileText, Clock
 } from 'lucide-react';
 import { PageLayout } from '../components/layout/PageLayout';
 

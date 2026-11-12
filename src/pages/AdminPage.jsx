@@ -19,7 +19,6 @@ const TABS = [
   { id: 'audit', label: 'Audit Log', icon: ScrollText },
 ];
 
-const STATUS_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
 const STATUS_OPTS = ['all', 'pending', 'verified', 'rejected', 'investigating'];
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
@@ -213,7 +212,7 @@ function ModerationTab() {
         </div>
       </div>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}
         title={`Mark as "${actionTarget?.newStatus}"`}>
         <div className="space-y-4">
           <p className="text-sm text-[#a09890]">
@@ -343,7 +342,7 @@ function ClustersTab() {
 
   const toggle = id => setExpanded(prev => {
     const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
     return next;
   });
 

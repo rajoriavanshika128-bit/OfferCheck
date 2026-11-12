@@ -5,6 +5,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
 
+// Defined at module scope so React sees a stable component identity across renders.
+// Defining this inside SignupPage would cause it to remount on every keystroke,
+// resetting focus and clearing entered values.
+function Field({ id, label, type = 'text', value, onChange, error, placeholder, ...rest }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-[#a09890] mb-1.5">{label}</label>
+      <input id={id} type={type} value={value} onChange={onChange} placeholder={placeholder}
+        className={`w-full bg-[#161616] border rounded-lg px-3 py-2.5 text-sm text-[#f0ede8] placeholder-[#6b6460] focus:outline-none transition-colors
+          ${error ? 'border-red-500/60 focus:border-red-500' : 'border-[#3a3a3a] focus:border-amber-500/60'}`}
+        {...rest} />
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 export default function SignupPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -40,17 +56,6 @@ export default function SignupPage() {
   };
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-
-  const Field = ({ id, label, type = 'text', value, onChange, error, placeholder, ...rest }) => (
-    <div>
-      <label className="block text-xs font-medium text-[#a09890] mb-1.5">{label}</label>
-      <input id={id} type={type} value={value} onChange={onChange} placeholder={placeholder}
-        className={`w-full bg-[#161616] border rounded-lg px-3 py-2.5 text-sm text-[#f0ede8] placeholder-[#6b6460] focus:outline-none transition-colors
-          ${error ? 'border-red-500/60 focus:border-red-500' : 'border-[#3a3a3a] focus:border-amber-500/60'}`}
-        {...rest} />
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center px-4 py-10">

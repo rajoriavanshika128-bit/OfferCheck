@@ -3,6 +3,17 @@ import { Shield, Search, BarChart3, Network, FileText, Zap, Eye, Upload, Fingerp
 import { Navbar } from '../components/layout/Navbar';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
 import { NODE_COLORS } from '../services/graphService';
+import { reports } from '../data/reports';
+import { identifiers } from '../data/identifiers';
+import { clusters } from '../data/clusters';
+
+// Derived from actual mock data — will stay accurate as datasets grow.
+const STATS = [
+  { v: String(reports.length), l: 'Reports in database' },
+  { v: `${identifiers.length}+`, l: 'Identifiers tracked' },
+  { v: String(clusters.length), l: 'Fraud clusters' },
+  { v: String(identifiers.filter(i => i.reportIds.length >= 2).length), l: 'Shared identifiers' },
+];
 
 // Animated decorative SVG trust graph for hero (purely illustrative)
 function HeroGraph() {
@@ -49,8 +60,8 @@ const FEATURES = [
   { icon: Network, title: 'Trust Graph', desc: 'Visualise connections between reports, identifiers and fraud clusters with multi-hop exploration.' },
   { icon: Search, title: 'Entity Resolution', desc: 'Shared UPI IDs, phones, emails and domains are cross-referenced across all submitted reports.' },
   { icon: BarChart3, title: 'Risk Scoring', desc: 'Each offer gets a transparent score with individual factor weights and supporting evidence.' },
-  { icon: FileText, title: 'Report Database', desc: 'Browse and search 35+ detailed reports with full risk factor breakdowns and cluster membership.' },
-  { icon: Zap, title: 'Identifier Matching', desc: 'Real-time matching against 70+ known fraud identifiers spanning UPIs, phones, emails and domains.' },
+  { icon: FileText, title: 'Report Database', desc: `Browse and search ${reports.length} detailed reports with full risk factor breakdowns and cluster membership.` },
+  { icon: Zap, title: 'Identifier Matching', desc: `Real-time matching against ${identifiers.length}+ known fraud identifiers spanning UPIs, phones, emails and domains.` },
   { icon: Eye, title: 'Transparent Evidence', desc: 'Every risk signal shows its evidence, confidence level, and plain-language explanation.' },
 ];
 
@@ -90,12 +101,7 @@ export default function LandingPage() {
       <div className="border-y border-[#2f2f2f] bg-[#161616]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {[
-              { v: '35', l: 'Reports in database' },
-              { v: '70+', l: 'Identifiers tracked' },
-              { v: '7', l: 'Fraud clusters' },
-              { v: '24', l: 'Shared identifiers' },
-            ].map(({ v, l }) => (
+            {STATS.map(({ v, l }) => (
               <div key={l}>
                 <p className="text-2xl font-bold text-amber-400">{v}</p>
                 <p className="text-sm text-[#6b6460] mt-1">{l}</p>
