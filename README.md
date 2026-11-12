@@ -1,16 +1,33 @@
-# React + Vite
+# OfferCheck
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**Internship & Job Fraud Intelligence Platform**
 
-Currently, two official plugins are available:
+OfferCheck is a platform designed to help students assess suspicious internship and job offers through explainable risk analysis, report verification, and entity resolution.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Key Features
 
-## React Compiler
+- **Offer Checker:** Analyse suspicious job and internship offers.
+- **Risk Analysis:** Understand risk scores and the evidence behind them.
+- **Trust Graph:** Explore connections between reports through shared identifiers.
+- **Reports Explorer:** Browse and investigate submitted reports.
+- **Admin Dashboard:** Review reports, manage identifiers, and monitor activity.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the Oxlint configuration
+- React
+- Vite
+- JavaScript
+- Tailwind CSS v4
+- React Router
+- Recharts
+- Lucide React
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Project Status
+
+Frontend implementation completed with fictional mock data.
+
+Backend integration with Node.js, Express, PostgreSQL, and Prisma is planned for a future phase.
+
+## Disclaimer
+
+OfferCheck is an educational project. Risk indicators
