@@ -1,0 +1,346 @@
+// prisma/schema.prisma
+// v2 — post-review corrections applied
+// 15 tables: evidence merged into report_identifiers, cluster_identifiers dropped,
+//            refresh_tokens added, risk_assessments versioned, clusters.risk_score removed
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  student
+  admin
+}
+
+enum ReportStatus {
+  pending
+  verified
+  rejected
+  investigating
+}
+
+enum IdentifierType {
+  phone
+  email
+  upi
+  domain
+  bank_account
+}
+
+enum ConfidenceLevel {
+  low
+  medium
+  high
+}
+
+enum RiskCategory {
+  low
+  medium
+  high
+  critical
+}
+
+enum ClusterStatus {
+  active
+  investigating
+  resolved
+  dismissed
+}
+
+enum AuditAction {
+  STATUS_CHANGED
+  IDENTIFIER_FLAGGED
+  IDENTIFIER_REVEALED
+  CLUSTER_CREATED
+  CLUSTER_UPDATED
+  REPORT_FLAGGED
+  REPORT_SUBMITTED
+  REPORT_DELETED
+  USER_BANNED
+}
+
+// ─── MODELS ──────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(120)
+  email         String   @unique @db.VarChar(254)
+  passwordHash  String   @map("password_hash") @db.VarChar(72)
+  role          UserRole @default(student)
+  college       String?  @db.VarChar(200)
+  isBanned      Boolean  @default(false) @map("is_banned")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  submittedReports   Report[]           @relation("SubmittedBy")
+  reviewedReports    Report[]           @relation("ReviewedBy")
+  savedReports       SavedReport[]
+  offerChecks        OfferCheck[]
+  auditLogsAsActor   AuditLog[]         @relation("ActorLogs")
+  auditLogsAsTarget  AuditLog[]         @relation("TargetUserLogs")
+  reportIdentifiers  ReportIdentifier[]
+  refreshTokens      RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  family    String    @map("family") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // ⚠️ Partial index WHERE revoked_at IS NULL must be in a custom SQL migration
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Company {
+  id              String   @id @default(uuid())
+  name            String   @db.VarChar(200)
+  domain          String?  @unique @db.VarChar(253)
+  industry        String?  @db.VarChar(100)
+  registeredState String?  @map("registered_state") @db.VarChar(80)
+  flagged         Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  reports    Report[]
+  recruiters RecruiterCompany[]
+
+  @@map("companies")
+}
+
+model Recruiter {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(120)
+  phone     String?  @db.VarChar(20)
+  email     String?  @db.VarChar(254)
+  flagged   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  reports   Report[]
+  companies RecruiterCompany[]
+
+  @@map("recruiters")
+}
+
+model RecruiterCompany {
+  recruiterId String @map("recruiter_id")
+  companyId   String @map("company_id")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([recruiterId, companyId])
+  @@map("recruiter_companies")
+}
+
+model Report {
+  id               String       @id @default(uuid())
+  submittedBy      String       @map("submitted_by")
+  reviewedBy       String?      @map("reviewed_by")
+  companyId        String?      @map("company_id")
+  recruiterId      String?      @map("recruiter_id")
+  companyNameRaw   String       @map("company_name_raw") @db.VarChar(200)
+  recruiterNameRaw String?      @map("recruiter_name_raw") @db.VarChar(120)
+  domainRaw        String?      @map("domain_raw") @db.VarChar(253)
+  phoneRaw         String?      @map("phone_raw") @db.VarChar(20)
+  emailRaw         String?      @map("email_raw") @db.VarChar(254)
+  upiRaw           String?      @map("upi_raw") @db.VarChar(80)
+  offerMessage     String       @map("offer_message")
+  paymentRequest   String?      @map("payment_request") @db.VarChar(300)
+  additionalNotes  String?      @map("additional_notes")
+  status           ReportStatus @default(pending)
+  submittedAt      DateTime     @default(now()) @map("submitted_at")
+  reviewedAt       DateTime?    @map("reviewed_at")
+  isVerified       Boolean      @default(false) @map("is_verified")
+  isInferred       Boolean      @default(false) @map("is_inferred")
+
+  // ⚠️ CHECK (reviewed_at IS NULL OR reviewed_by IS NOT NULL) must be in custom SQL migration
+  // ⚠️ ON DELETE RESTRICT on submitted_by must be in custom SQL migration
+
+  submitter       User               @relation("SubmittedBy", fields: [submittedBy], references: [id])
+  reviewer        User?              @relation("ReviewedBy", fields: [reviewedBy], references: [id])
+  company         Company?           @relation(fields: [companyId], references: [id])
+  recruiter       Recruiter?         @relation(fields: [recruiterId], references: [id])
+  identifiers     ReportIdentifier[]
+  riskAssessments RiskAssessment[] // 1:N versioned; query WHERE isCurrent = true for active
+  clusters        ClusterReport[]
+  savedBy         SavedReport[]
+  auditLogs       AuditLog[]
+
+  @@map("reports")
+}
+
+model Identifier {
+  id              String         @id @default(uuid())
+  type            IdentifierType
+  value           String         @db.VarChar(300)
+  normalizedValue String         @map("normalized_value") @db.VarChar(300)
+  riskScore       Int            @default(0) @map("risk_score") @db.SmallInt
+  flagged         Boolean        @default(false)
+  confidence      ConfidenceLevel @default(low)
+  notes           String?
+  firstSeen       DateTime       @default(now()) @map("first_seen")
+  lastSeen        DateTime       @default(now()) @map("last_seen")
+
+  reports   ReportIdentifier[]
+  auditLogs AuditLog[]
+
+  @@unique([type, normalizedValue])
+  @@map("identifiers")
+}
+
+model ReportIdentifier {
+  reportId         String          @map("report_id")
+  identifierId     String          @map("identifier_id")
+  confidence       ConfidenceLevel @default(medium)
+  matchType        String?         @map("match_type") @db.VarChar(50)
+  matchDescription String?         @map("match_description")
+  addedBy          String?         @map("added_by")
+  addedAt          DateTime        @default(now()) @map("added_at")
+
+  report      Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  identifier  Identifier @relation(fields: [identifierId], references: [id])
+  addedByUser User?      @relation(fields: [addedBy], references: [id])
+
+  @@id([reportId, identifierId])
+  @@map("report_identifiers")
+}
+
+// evidence model removed — match metadata merged into ReportIdentifier (matchType, matchDescription)
+
+model RiskAssessment {
+  id         String       @id @default(uuid())
+  reportId   String       @map("report_id") // No @unique — multiple versions allowed
+  score      Int          @db.SmallInt
+  category   RiskCategory
+  summary    String?
+  disclaimer String?
+  assessedAt DateTime     @default(now()) @map("assessed_at")
+  assessedBy String       @default("system") @map("assessed_by")
+  isCurrent  Boolean      @default(true) @map("is_current")
+  version    Int          @default(1) @db.SmallInt
+
+  // ⚠️ Partial unique index WHERE is_current = TRUE must be in custom SQL migration:
+  //    CREATE UNIQUE INDEX idx_risk_assessments_current
+  //      ON risk_assessments (report_id) WHERE is_current = TRUE;
+
+  report  Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  factors RiskFactor[]
+
+  @@map("risk_assessments")
+}
+
+model RiskFactor {
+  id           String          @id @default(uuid())
+  assessmentId String          @map("assessment_id")
+  factorKey    String          @map("factor_key") @db.VarChar(80)
+  description  String          @db.VarChar(300)
+  weight       Int             @db.SmallInt
+  evidenceText String?         @map("evidence_text")
+  confidence   ConfidenceLevel @default(medium)
+  explanation  String
+
+  assessment RiskAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("risk_factors")
+}
+
+model Cluster {
+  id              String          @id @default(uuid())
+  name            String          @db.VarChar(200)
+  description     String?
+  // riskScore removed — computed on demand via JOIN to cluster_reports → risk_assessments
+  confidence      ConfidenceLevel @default(medium)
+  status          ClusterStatus   @default(active)
+  connectionBasis String?         @map("connection_basis")
+  discoveredAt    DateTime        @default(now()) @map("discovered_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  reports   ClusterReport[]
+  auditLogs AuditLog[]
+
+  @@map("clusters")
+}
+
+model ClusterReport {
+  clusterId String @map("cluster_id")
+  reportId  String @map("report_id")
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  report  Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@id([clusterId, reportId])
+  @@map("cluster_reports")
+}
+
+// ClusterIdentifier dropped for v1 — derived via SQL JOIN on report_identifiers + cluster_reports
+
+model SavedReport {
+  userId   String   @map("user_id")
+  reportId String   @map("report_id")
+  savedAt  DateTime @default(now()) @map("saved_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@id([userId, reportId])
+  @@map("saved_reports")
+}
+
+model OfferCheck {
+  id           String        @id @default(uuid())
+  userId       String?       @map("user_id")
+  companyName  String?       @map("company_name") @db.VarChar(200)
+  phoneQuery   String?       @map("phone_query") @db.VarChar(20)
+  emailQuery   String?       @map("email_query") @db.VarChar(254)
+  upiQuery     String?       @map("upi_query") @db.VarChar(80)
+  domainQuery  String?       @map("domain_query") @db.VarChar(253)
+  riskScore    Int?          @map("risk_score") @db.SmallInt
+  riskCategory RiskCategory? @map("risk_category")
+  result       Json? // nullable — populated on insert; nullified after 90 days by scheduled job
+  ipHash       String?       @map("ip_hash") @db.Char(64) // HMAC-SHA256(client_ip, IP_HASH_SECRET)
+  checkedAt    DateTime      @default(now()) @map("checked_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("offer_checks")
+}
+
+model AuditLog {
+  id           String      @id @default(uuid())
+  actorId      String      @map("actor_id")
+  action       AuditAction
+  reportId     String?     @map("report_id")
+  identifierId String?     @map("identifier_id")
+  clusterId    String?     @map("cluster_id")
+  targetUserId String?     @map("target_user_id") // for USER_BANNED, IDENTIFIER_REVEALED
+  oldValue     String?     @map("old_value") @db.VarChar(100)
+  newValue     String?     @map("new_value") @db.VarChar(100)
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  // ⚠️ CHECK (at least one target non-null) must be in custom SQL migration
+  // ⚠️ ON DELETE RESTRICT on actor_id must be in custom SQL migration
+
+  actor      User        @relation("ActorLogs", fields: [actorId], references: [id])
+  targetUser User?       @relation("TargetUserLogs", fields: [targetUserId], references: [id])
+  report     Report?     @relation(fields: [reportId], references: [id])
+  identifier Identifier? @relation(fields: [identifierId], references: [id])
+  cluster    Cluster?    @relation(fields: [clusterId], references: [id])
+
+  @@map("audit_logs")
+}
+

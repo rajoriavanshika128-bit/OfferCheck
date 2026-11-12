@@ -1,0 +1,30 @@
+{
+  "name": "offercheck-backend",
+  "version": "1.0.0",
+  "description": "OfferCheck backend API — Node.js + Express + PostgreSQL + Prisma",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "prisma:generate": "dotenv run -q -f ../.env -- prisma generate",
+    "prisma:validate": "dotenv run -q -f ../.env -- prisma validate",
+    "prisma:migrate": "dotenv run -q -f ../.env -- prisma migrate dev",
+    "prisma:studio": "dotenv run -q -f ../.env -- prisma studio",
+    "lint": "node --check src/server.js src/app.js src/utils/prisma.js src/utils/errors.js src/middleware/auth.js src/middleware/requireAdmin.js src/middleware/validate.js src/routes/health.routes.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^4.22.3",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "prisma": "^6.19.3",
+    "zod": "^4.6.7"
+  }
+}
