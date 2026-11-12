@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Shield, Search, BarChart3, Network, FileText, Zap, Eye } from 'lucide-react';
+import { Shield, Search, BarChart3, Network, FileText, Zap, Eye, Upload, Fingerprint, GitMerge } from 'lucide-react';
 import { Navbar } from '../components/layout/Navbar';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
 import { NODE_COLORS } from '../services/graphService';
@@ -38,9 +38,11 @@ function HeroGraph() {
 }
 
 const STEPS = [
-  { n: '01', title: 'Submit Offer Details', desc: 'Enter the recruiter\'s contact info, UPI ID, company domain, and paste the offer message.' },
-  { n: '02', title: 'Entity Resolution & Analysis', desc: 'OfferCheck cross-references identifiers against a database of reported fraud patterns and shared signals.' },
-  { n: '03', title: 'See Risk Assessment', desc: 'Get a transparent risk score with individual factor breakdowns, evidence, and confidence levels.' },
+  { n: '01', icon: Upload, title: 'Submit an Offer', desc: 'Enter the recruiter\'s contact info, UPI ID, company domain, and paste the offer message.' },
+  { n: '02', icon: Fingerprint, title: 'Identifier Extraction', desc: 'Phone numbers, emails, UPI IDs and domains are normalised and prepared for matching.' },
+  { n: '03', icon: GitMerge, title: 'Entity Resolution', desc: 'OfferCheck cross-references identifiers against previously reported fraud signals.' },
+  { n: '04', icon: Network, title: 'Trust Graph', desc: 'Connected reports and identifiers are linked, surfacing fraud clusters and shared infrastructure.' },
+  { n: '05', icon: BarChart3, title: 'Risk Analysis', desc: 'You receive a risk score with individual factor breakdowns, evidence, and confidence levels.' },
 ];
 
 const FEATURES = [
@@ -86,29 +88,51 @@ export default function LandingPage() {
 
       {/* Stats bar */}
       <div className="border-y border-[#2f2f2f] bg-[#161616]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {[['35', 'Reports'], ['70+', 'Identifiers'], ['7', 'Fraud Clusters'], ['Real-time', 'Analysis']].map(([v, l]) => (
-            <div key={l}>
-              <p className="text-2xl font-bold text-amber-400">{v}</p>
-              <p className="text-sm text-[#6b6460] mt-1">{l}</p>
-            </div>
-          ))}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {[
+              { v: '35', l: 'Reports in database' },
+              { v: '70+', l: 'Identifiers tracked' },
+              { v: '7', l: 'Fraud clusters' },
+              { v: '24', l: 'Shared identifiers' },
+            ].map(({ v, l }) => (
+              <div key={l}>
+                <p className="text-2xl font-bold text-amber-400">{v}</p>
+                <p className="text-sm text-[#6b6460] mt-1">{l}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-xs text-[#4a4a4a] mt-4">
+            Sample data only — figures reflect the demo dataset, not live submissions.
+          </p>
         </div>
       </div>
 
       {/* How It Works */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h2 className="text-2xl font-bold text-center text-[#f0ede8] mb-12">How It Works</h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          {STEPS.map(s => (
-            <div key={s.n} className="relative pl-14">
-              <div className="absolute left-0 top-0 w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-sm font-bold">
-                {s.n}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-12">
+          <h2 className="text-2xl font-bold text-[#f0ede8]">How It Works</h2>
+          <Link to="/how-it-works"
+            className="text-sm text-amber-400 hover:text-amber-300 transition-colors shrink-0">
+            Full explanation →
+          </Link>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {STEPS.map(s => {
+            const Icon = s.icon;
+            return (
+              <div key={s.n} className="flex flex-col gap-3 p-5 rounded-xl border border-[#2f2f2f] bg-[#161616]">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <Icon size={16} className="text-amber-400" />
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#4a4a4a]">{s.n}</span>
+                </div>
+                <h3 className="font-semibold text-[#f0ede8] text-sm">{s.title}</h3>
+                <p className="text-sm text-[#a09890] leading-relaxed">{s.desc}</p>
               </div>
-              <h3 className="font-semibold text-[#f0ede8] mb-2">{s.title}</h3>
-              <p className="text-sm text-[#a09890] leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
