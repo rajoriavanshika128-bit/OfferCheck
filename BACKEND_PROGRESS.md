@@ -2,7 +2,7 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 2A (Backend Foundation) — ✅ COMPLETE
+**Status:** Phase 2B Step 1 (PostgreSQL Database Setup) — ✅ COMPLETE
 
 ---
 
@@ -90,6 +90,127 @@ ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_has_target
 ALTER TABLE reports ADD CONSTRAINT chk_reviewed
   CHECK (reviewed_at IS NULL OR reviewed_by IS NOT NULL);
 ```
+
+---
+
+## Phase 2B Step 1 — PostgreSQL Database Setup ✅ COMPLETE
+
+**Completed:** 2026-11-13
+
+### Pre-flight Checks
+
+| Check | Result |
+|---|---|
+| Git branch | ✅ `main`, HEAD = `4cc0846` |
+| Working tree | ✅ Clean (no uncommitted tracked changes) |
+| `DATABASE_URL` target | ✅ `postgresql://[credentials]@localhost:5432/offercheck_dev` |
+| Database before migration | ✅ Confirmed empty — 0 tables, 0 enums |
+| Prisma binary present | ✅ `node_modules/.bin/prisma` |
+| `prisma validate` | ✅ exit 0 — "schema is valid 🚀" |
+
+### Schema Verification — All 15 Models ✅
+
+| Table | PK | FK(s) | Unique | Nullable | On Delete |
+|---|---|---|---|---|---|
+| `users` | `id` UUID | — | `email` | `college` | — |
+| `refresh_tokens` | `id` UUID | `user_id → users` | `token_hash` | `revoked_at` | CASCADE |
+| `companies` | `id` UUID | — | `domain` | `domain`, `industry`, `registered_state` | — |
+| `recruiters` | `id` UUID | — | — | `phone`, `email` | — |
+| `recruiter_companies` | `(recruiter_id, company_id)` | both → parent tables | — | — | CASCADE both |
+| `reports` | `id` UUID | `submitted_by → users` RESTRICT, `reviewed_by → users` SET NULL, `company_id` SET NULL, `recruiter_id` SET NULL | — | most raw fields, `reviewed_by/at` | RESTRICT / SET NULL |
+| `identifiers` | `id` UUID | — | `(type, normalized_value)` | `notes` | — |
+| `report_identifiers` | `(report_id, identifier_id)` | `report_id → reports` CASCADE, `identifier_id → identifiers` RESTRICT, `added_by → users` SET NULL | — | `match_type`, `match_description`, `added_by` | CASCADE / RESTRICT / SET NULL |
+| `risk_assessments` | `id` UUID | `report_id → reports` CASCADE | partial unique WHERE `is_current=TRUE` | `summary`, `disclaimer` | CASCADE |
+| `risk_factors` | `id` UUID | `assessment_id → risk_assessments` CASCADE | — | `evidence_text` | CASCADE |
+| `clusters` | `id` UUID | — | — | `description`, `connection_basis` | — |
+| `cluster_reports` | `(cluster_id, report_id)` | both → parent tables CASCADE | — | — | CASCADE both |
+| `saved_reports` | `(user_id, report_id)` | both → parent tables CASCADE | — | — | CASCADE both |
+| `offer_checks` | `id` UUID | `user_id → users` SET NULL | — | most fields | SET NULL |
+| `audit_logs` | `id` UUID | `actor_id → users` RESTRICT, `target_user_id` SET NULL, `report_id` SET NULL, `identifier_id` SET NULL, `cluster_id` SET NULL | — | all target fields | RESTRICT / SET NULL |
+
+### Migration
+
+| Item | Result |
+|---|---|
+| Migration name | `20261113082200_init` |
+| File | `backend/prisma/migrations/20261113082200_init/migration.sql` |
+| Prisma-generated DDL | ✅ 15 tables, 7 enums, 4 unique indexes, 18 foreign keys |
+| Custom SQL appended | ✅ 4 blocks (see below) |
+| Applied with | `prisma migrate deploy` (no reset, no data loss) |
+| `prisma migrate status` | ✅ "Database schema is up to date!" |
+
+**Custom SQL added to migration (not expressible in schema.prisma):**
+
+```sql
+-- 1. Partial unique index: at most one is_current=TRUE assessment per report
+CREATE UNIQUE INDEX "idx_risk_assessments_current"
+  ON "risk_assessments" ("report_id") WHERE "is_current" = TRUE;
+
+-- 2. Partial index: fast hot-path lookup of non-revoked refresh tokens
+CREATE INDEX "idx_refresh_tokens_active"
+  ON "refresh_tokens" ("token_hash") WHERE "revoked_at" IS NULL;
+
+-- 3. CHECK: audit_logs must have at least one target reference
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_has_target"
+  CHECK ("report_id" IS NOT NULL OR "identifier_id" IS NOT NULL
+      OR "cluster_id" IS NOT NULL OR "target_user_id" IS NOT NULL);
+
+-- 4. CHECK: reports.reviewed_at requires reviewed_by to be set
+ALTER TABLE "reports" ADD CONSTRAINT "chk_reviewed"
+  CHECK ("reviewed_at" IS NULL OR "reviewed_by" IS NOT NULL);
+```
+
+### Database Verification (Read-Only)
+
+| Check | Result |
+|---|---|
+| Tables in `public` schema | ✅ 15 app tables + `_prisma_migrations` = 16 total |
+| Enums created | ✅ 7: `UserRole`, `ReportStatus`, `IdentifierType`, `ConfidenceLevel`, `RiskCategory`, `ClusterStatus`, `AuditAction` |
+| `users_email_key` unique index | ✅ Present |
+| `refresh_tokens_token_hash_key` unique index | ✅ Present |
+| `companies_domain_key` unique index | ✅ Present |
+| `identifiers_type_normalized_value_key` unique index | ✅ Present |
+| `idx_risk_assessments_current` partial unique index | ✅ Present — `WHERE is_current = TRUE` |
+| `idx_refresh_tokens_active` partial index | ✅ Present — `WHERE revoked_at IS NULL` |
+| `audit_logs_has_target` CHECK constraint | ✅ Present |
+| `chk_reviewed` CHECK constraint | ✅ Present |
+| `audit_logs_actor_id_fkey` ON DELETE RESTRICT | ✅ Present |
+| `reports_submitted_by_fkey` ON DELETE RESTRICT | ✅ Present |
+| All 15 tables empty | ✅ 0 rows each (no seed data) |
+
+### Prisma Client Connection Test
+
+| Test | Result |
+|---|---|
+| `PrismaClient` connects to `offercheck_dev` | ✅ exit 0 |
+| `count()` on all 15 models | ✅ All return 0 (no errors) |
+
+### Express Health Endpoint
+
+| Test | Result |
+|---|---|
+| `GET /health` | ✅ HTTP 200 — `{"status":"ok","service":"offercheck-api","env":"development","timestamp":"..."}` |
+
+### Files Created or Modified
+
+| File | Action |
+|---|---|
+| `backend/prisma/migrations/20261113082200_init/migration.sql` | ✅ Created (Prisma DDL + 4 custom SQL blocks) |
+| `backend/prisma/migrations/20261113082200_init/migration.lock` | ✅ Created by Prisma |
+| `BACKEND_PROGRESS.md` | ✅ Updated |
+
+### Preservation Confirmations
+
+- ✅ No frontend files modified (`git diff HEAD -- src/` → empty)
+- ✅ No mock data files modified
+- ✅ No `prisma db push`, no `migrate reset`, no `DROP`
+- ✅ No new npm packages installed
+- ✅ No secrets printed or exposed
+- ✅ Not committed or pushed (awaiting approval)
+
+### Warnings
+
+- ℹ️ Prisma CLI showed upgrade notice (v6.19.3 → v8.0.0-rc.33). **Ignored** — RC version; v6 is stable and correct for this project.
 
 ---
 
@@ -230,5 +351,5 @@ Located in `backend/node_modules/` — 261 packages total. **Do not reinstall.**
 
 ---
 
-*Last updated: Phase 2A complete. Awaiting Phase 2B approval.*
+*Last updated: Phase 2B Step 1 complete. Awaiting approval for Phase 2B Step 2 (seed data / API).*
 
