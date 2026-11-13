@@ -3,17 +3,9 @@
 /**
  * src/middleware/requireAdmin.js
  * Role-guard middleware. Must be used after auth middleware.
- * Role is derived from the JWT payload — never from the request body.
+ * Preserves 100% backward compatibility with Phase 4A/4B tests and imports.
  */
 
-const { AppError } = require('../utils/errors');
-
-function requireAdmin(req, _res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return next(new AppError('Admin access required', 403));
-  }
-  next();
-}
+const { requireAdmin } = require('./authorize');
 
 module.exports = requireAdmin;
-

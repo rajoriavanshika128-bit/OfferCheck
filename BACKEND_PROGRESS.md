@@ -2,7 +2,84 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 4B (Refresh Tokens, Rotation, Reuse Detection & Logout) — ✅ COMPLETE
+**Status:** Phase 4C (RBAC, Ownership & Privacy Utilities) — ✅ COMPLETE (Stage 1 & 2)
+
+---
+
+## Phase 4C — Role-Based Access Control, Ownership & Privacy Utilities ✅ COMPLETE
+
+**Completed:** 2026-11-13
+
+### Summary of Implementation
+
+Phase 4C establishes the authorization and privacy layer for OfferCheck:
+1. **RBAC Middleware Factory (`src/middleware/authorize.js`):**
+   - Reusable `requireRole(...roles)` middleware verifying authenticated user roles attached by `auth.js`.
+   - Backward-compatible `requireAdmin` alias (`requireRole('admin')`), ensuring 100% preservation of Phase 4A/4B behavior and error signatures (`Admin access required` / HTTP 403).
+   - `src/middleware/requireAdmin.js` modified to re-export `requireAdmin` from `authorize.js`.
+2. **Ownership & Self-Action Assertions (`src/utils/rbac.js`):**
+   - `assertOwnership(resourceOwnerId, currentUser, options)`: Reusable assertion helper supporting admin bypass or strict owner checks.
+   - `assertNotSelf(actorId, targetUserId, action)`: Guard preventing administrative self-targeting (e.g., self-ban, self-role changes).
+3. **Server-Side PII Masking Engine (`src/utils/privacy.js`):**
+   - `maskPhone`, `maskEmail`, `maskUpi`, `maskBankAccount`: Contact PII formatting.
+   - `maskReportForRole(report, role)` & `maskIdentifierForRole(identifier, role)`: Explicit schema-based response sanitization.
+   - Strict allow-list for nested recruiter (`id`, `name`, `flagged`, masked `phone`/`email`, `createdAt`; excludes credentials and internal fields).
+   - Strict allow-list for nested submitter & reviewer (strips submitter `email`, `passwordHash`, `isBanned`, `refreshTokens`).
+   - Recursively sanitizes nested junction records (`ReportIdentifier.identifier`).
+   - Preserves non-PII fraud intelligence fields (`riskScore`, `riskCategory`, `domainRaw`, `isVerified`, etc.).
+   - `deepClone` safely preserves JavaScript `Date` instances, Node `Buffer`, and Prisma `Decimal` instances.
+   - Guaranteed non-mutation of input objects (verified via `Object.freeze` test fixtures).
+
+### Active Endpoint Status & Protections
+
+- **`GET /api/auth/me` (Active User-Owned Endpoint):**
+  - Protected by `auth` middleware; strictly bound to `req.user.id` (derived from validated JWT and PostgreSQL record).
+  - Accepts no client-supplied ID parameters or query arguments (inherent IDOR immunity).
+  - Explicitly sanitized via `sanitizeUser(user)` returning only safe public profile fields (`id`, `name`, `email`, `role`, `college`, `createdAt`).
+- **`POST /api/auth/signup` & `POST /api/auth/login`:**
+  - Registration enforces server-assigned role `'student'`.
+  - Responses strictly sanitized via `sanitizeUser`.
+- **`POST /api/auth/refresh` & `POST /api/auth/logout`:**
+  - Token family rotation and reuse detection intact; returns only opaque tokens and status flags.
+
+### Endpoint-Level Integrations Deferred to Later Phases
+
+To prevent premature or artificial endpoints, the following route integrations are explicitly deferred to their respective roadmap phases:
+- **Phase 5 (Reports & Checks):**
+  - `GET /api/reports` & `GET /api/reports/:id`: Response-level masking via `maskReportForRole`.
+  - `POST /api/reports`: Server-enforced `submittedBy = req.user.id`.
+  - `POST /api/checks`: Response masking for connected reports and matched identifiers.
+  - `GET /api/dashboard/stats`: Query-level scoping to `req.user.id`.
+  - `SavedReport` endpoints: Prisma composite key query scoping (`where: { userId: req.user.id }`).
+- **Phase 6 (Identifiers & Clusters):**
+  - `GET /api/identifiers`: Response-level masking via `maskIdentifierForRole`.
+- **Phase 8 (Admin Moderation):**
+  - `PATCH /api/admin/users/:id/ban`: Admin-only route enforcing `assertNotSelf` and atomic transaction writing to `audit_logs` (`action: 'USER_BANNED'`).
+  - `PATCH /api/admin/reports/:id`: Atomic status update, risk re-versioning, and `audit_logs` write (`action: 'STATUS_CHANGED'`).
+
+### Verification & Unit Test Results (31 / 31 Passed)
+
+Executed via standalone test suite `backend/test/phase4c_unit.test.js`:
+
+| # | Test Group / Feature | Expected | Result |
+|---|---|---|---|
+| 1–7 | RBAC (`requireRole`, `requireAdmin`) | 401 unauth, 403 on role mismatch, admin allowed, backward compat | ✅ PASS |
+| 8–12 | Ownership (`assertOwnership`) | Owner allowed, cross-user 403, admin bypass, strict owner check, 401 unauth | ✅ PASS |
+| 13–15 | Self-Action (`assertNotSelf`) | Cross-user allowed, self-action 400 with description, 401 missing actor | ✅ PASS |
+| 16–19 | PII Formatting (`phone`, `email`, `upi`, `bank_account`) | Correct masking formats, edge cases, null handling | ✅ PASS |
+| 20–21 | `deepClone` Type Preservation | `Date` instance preservation & independence, `MockDecimal` & `Buffer` preservation | ✅ PASS |
+| 22–26 | Nested PII & Strict Allow-Lists | Recruiter allow-list, submitter credential stripping, reviewer allow-list, junction records | ✅ PASS |
+| 27–29 | Non-PII & Extra Field Preservation | Fraud intel fields intact, uncorrupted arbitrary fields, domain unmasked | ✅ PASS |
+| 30–31 | Non-Mutation Safety | Frozen report and frozen identifier strictly unmutated | ✅ PASS |
+
+### Database Verification Status
+
+- **Unit Layer:** 31 / 31 unit tests passed with mocked objects (zero network, zero DB access).
+- **Prisma Schema:** Validated via `npx prisma validate --schema=prisma/schema.prisma` (schema is valid 🚀).
+- **Syntax & Lint:** Validated via `npm run lint` across all 16 backend source files (exit code 0).
+- **Database Integration Tests:** Deferred. Database-backed integration tests against `offercheck_test` require an explicitly configured, safe test database environment variable and were not run to prevent any connection to `.env` or `offercheck_dev`.
+
+---
 
 ---
 
