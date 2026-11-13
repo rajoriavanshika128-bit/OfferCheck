@@ -17,6 +17,7 @@ async function signup(req, res, next) {
       success: true,
       user: result.user,
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     });
   } catch (err) {
     next(err);
@@ -33,7 +34,36 @@ async function login(req, res, next) {
       success: true,
       user: result.user,
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/refresh
+ */
+async function refresh(req, res, next) {
+  try {
+    const result = await authService.rotateRefreshToken(req.body.refreshToken);
+    return res.status(200).json({
+      success: true,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/logout
+ */
+async function logout(req, res, next) {
+  try {
+    const result = await authService.logout(req.body.refreshToken);
+    return res.status(200).json(result);
   } catch (err) {
     next(err);
   }
@@ -57,5 +87,7 @@ async function getMe(req, res, next) {
 module.exports = {
   signup,
   login,
+  refresh,
+  logout,
   getMe,
 };

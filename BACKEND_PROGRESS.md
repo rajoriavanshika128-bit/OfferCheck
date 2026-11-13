@@ -2,7 +2,7 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 4A (Signup, Login & Access Authentication) — ✅ COMPLETE
+**Status:** Phase 4B (Refresh Tokens, Rotation, Reuse Detection & Logout) — ✅ COMPLETE
 
 ---
 
@@ -280,6 +280,56 @@ Directly queried from `offercheck_dev` after completion:
 - ✅ No destructive SQL executed (`DROP`, `TRUNCATE`, `DELETE`, `deleteMany`, `db push`, `migrate reset`)
 - ✅ No environment secrets printed or staged
 - ✅ Changes not committed or pushed (awaiting review)
+
+---
+
+## Phase 4B — Refresh Tokens, Rotation, Reuse Detection & Logout ✅ COMPLETE
+
+**Completed:** 2026-11-13
+
+### Endpoints Implemented
+
+| Endpoint | Method | Middleware | Purpose |
+|---|---|---|---|
+| `/api/auth/refresh` | POST | `validate(refreshSchema)` | Rotates refresh token atomically, enforces reuse detection, revokes entire family on theft detection, issues new access + refresh token. |
+| `/api/auth/logout` | POST | `validate(logoutSchema)` | Revokes submitted refresh token and its active family chain in PostgreSQL. |
+| `/api/auth/signup` | POST | `validate(signupSchema)` | Updated to issue opaque refresh token with SHA-256 hash and UUID `family` alongside access token. |
+| `/api/auth/login` | POST | `validate(loginSchema)` | Updated to issue opaque refresh token with SHA-256 hash and UUID `family` alongside access token. |
+
+### Security & Concurrency Measures Implemented
+
+1. **Opaque 256-Bit Refresh Tokens:** Generated using `crypto.randomBytes(32).toString('hex')` (64 hex characters). Only SHA-256 hashes (`CHAR(64)`) are stored in PostgreSQL; raw tokens are never persisted or logged.
+2. **Atomic Token Rotation:** Inside `prisma.$transaction`, the current active token is conditionally revoked (`where: { id, revokedAt: null }`), and a new refresh token is issued under the same UUID `family`.
+3. **Token Reuse Detection:** If an already-revoked refresh token is presented, the entire family is immediately revoked (`updateMany({ where: { family, revokedAt: null } })`), neutralizing compromised token chains and returning HTTP 401.
+4. **Concurrency Conflict Protection:** When two requests attempt rotation with the same token concurrently, exactly one succeeds (`count === 1`). The losing request's conditional update matches 0 rows and returns HTTP 409 Conflict without destroying the winner's newly issued session.
+5. **Account Suspension on Refresh:** If a user is banned (`isBanned: true`), refresh attempts are rejected with HTTP 403 and all active refresh tokens for that user are revoked.
+6. **Transaction Atomicity & Rollback:** If any database failure occurs during rotation, all partial writes are rolled back, leaving zero orphaned or partially revoked tokens.
+7. **Cascade Deletion:** `userId` foreign key constraint (`ON DELETE CASCADE`) ensures deleting a user cleanly deletes all associated `refresh_tokens`.
+8. **Atomic Signup Transaction:** User creation and initial refresh token creation run inside a single `prisma.$transaction`, ensuring user creation rolls back completely if initial token issuance fails.
+9. **PostgreSQL Row-Lock Serialization (`FOR UPDATE`):** `rotateRefreshToken` locks the `users` row using `SELECT id, email, role, is_banned AS "isBanned" FROM users WHERE id = $1 FOR UPDATE`. This strictly serializes rotation with admin suspension (`UPDATE users SET is_banned = TRUE`):
+   - Any concurrent suspension attempt during rotation is blocked until rotation commits (at which point the admin immediately revokes the newly issued token).
+   - Any rotation attempt arriving while an admin suspension is in flight is blocked until the admin commits, whereupon rotation immediately reads `isBanned = true`, aborts, and rejects with HTTP 403.
+
+### Verification & Automated Test Results (35 / 35 Passed)
+
+Executed against isolated test database `offercheck_test`:
+
+| # | Test Case | Expected | Result |
+|---|---|---|---|
+| 1–22 | All Phase 4A Regression Tests | All 22 Phase 4A auth, bcrypt, Zod byte limit, and error tests pass | ✅ PASS |
+| 23 | Successful refresh token rotation | HTTP 200, new access token + new refresh token in same family | ✅ PASS |
+| 24 | Previous token reuse triggers family revocation | HTTP 401, all tokens in family revoked in DB | ✅ PASS |
+| 25 | Subsequent rotation with compromised family token rejected | HTTP 401 on attempts to use any token from revoked family | ✅ PASS |
+| 26 | Unknown and malformed refresh tokens rejected | HTTP 401 on nonexistent token, HTTP 400 on empty token | ✅ PASS |
+| 27 | Expired refresh token rejected | HTTP 401 'Refresh token expired' | ✅ PASS |
+| 28 | Logout and subsequent refresh rejection | HTTP 200 on logout, token revoked in DB, subsequent refresh fails | ✅ PASS |
+| 29 | Banned user refresh rejection & session revocation | HTTP 403, all active refresh tokens for user revoked | ✅ PASS |
+| 30 | Two concurrent requests using same token handled safely | Exactly one 200 winner, one 409 conflict, zero 500s | ✅ PASS |
+| 31 | Transaction failure and rollback verified | Database state completely rolled back on transaction error | ✅ PASS |
+| 32 | Cascade deletion of refresh tokens on user delete | All refresh tokens removed when user is deleted | ✅ PASS |
+| 33 | Atomic signup rollback on refresh token creation failure | User creation completely rolled back if initial token insert fails | ✅ PASS |
+| 34 | Concurrent suspension serialized via `FOR UPDATE` | Admin suspension blocked during rotation tx; completes after commit | ✅ PASS |
+| 35 | Rotation blocked behind active suspension | Unblocks after admin commit, observes `isBanned = true`, aborts with 403 | ✅ PASS |
 
 ---
 

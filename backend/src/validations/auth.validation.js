@@ -51,7 +51,23 @@ const loginSchema = z.object({
     ),
 });
 
+const refreshSchema = z.object({
+  refreshToken: z
+    .string({ required_error: 'Refresh token is required' })
+    .trim()
+    .min(1, 'Refresh token is required'),
+});
+
+const logoutSchema = z.object({
+  refreshToken: z
+    .string({ required_error: 'Refresh token is required' })
+    .trim()
+    .min(1, 'Refresh token is required'),
+});
+
 module.exports = {
   signupSchema,
   loginSchema,
+  refreshSchema,
+  logoutSchema,
 };

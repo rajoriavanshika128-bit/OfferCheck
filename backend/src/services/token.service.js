@@ -10,6 +10,25 @@ const crypto = require('crypto');
 
 const ACCESS_TOKEN_EXPIRY = '15m';
 const SIGNING_ALGORITHM = 'HS256';
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+
+/**
+ * Generate a cryptographically secure opaque refresh token (256-bit entropy).
+ *
+ * @returns {string} 64-character lowercase hex string
+ */
+function generateRefreshToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Calculate expiration timestamp for a new refresh token.
+ *
+ * @returns {Date} Date 7 days from now
+ */
+function calculateRefreshTokenExpiry() {
+  return new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+}
 
 /**
  * Generate a short-lived access token.
@@ -67,6 +86,9 @@ module.exports = {
   generateAccessToken,
   verifyAccessToken,
   hashToken,
+  generateRefreshToken,
+  calculateRefreshTokenExpiry,
   ACCESS_TOKEN_EXPIRY,
   SIGNING_ALGORITHM,
+  REFRESH_TOKEN_EXPIRY_DAYS,
 };
