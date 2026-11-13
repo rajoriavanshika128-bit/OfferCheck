@@ -2,7 +2,7 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 2B Step 1 (PostgreSQL Database Setup) — ✅ COMPLETE
+**Status:** Phase 3 (Database Seeding) — ✅ COMPLETE
 
 ---
 
@@ -214,6 +214,75 @@ ALTER TABLE "reports" ADD CONSTRAINT "chk_reviewed"
 
 ---
 
+## Phase 3 — Database Seeding ✅ COMPLETE
+
+**Completed:** 2026-11-13
+
+### Summary of Implementation
+
+Phase 3 seed implementation is complete. The baseline mock dataset was transformed and inserted into the local PostgreSQL `offercheck_dev` database following the approved architecture design, 5 sequential dependency-ordered transactions, and non-destructive `upsert` semantics with `update: {}`.
+
+### Implementation Files
+
+| File | Action | Details |
+|---|---|---|
+| `backend/prisma/seed.js` | Created | Standalone idempotent seed script (~480 lines). Preflight safety checks, bcrypt password hashing, 5 transactions, documented CL005 `verified` → `resolved` mapping, non-evidenced pair handling without fabrication, and post-seed assertions. |
+| `backend/package.json` | Modified | Added `"prisma:seed": "dotenv run -q -f ../.env -- prisma db seed"` and `"prisma": { "seed": "node prisma/seed.js" }`. |
+
+### Execution & Idempotency Results
+
+| Run | Command | Exit Code | Result |
+|---|---|---|---|
+| First Run | `cd backend && npm run prisma:seed` | 0 | All 5 transactions executed; seeded all 13 tables from 0 to expected counts. |
+| Second Run | `cd backend && npm run prisma:seed` | 0 | Idempotency confirmed: 0 duplicate rows created, 0 existing values overwritten (`update: {}`). All counts identical. |
+
+### Verified Database Row Counts (All 15 Tables)
+
+Directly queried from `offercheck_dev` after completion:
+
+| Table | Expected | First Run | Second Run | Verified Post-Seed | Status |
+|---|---|---|---|---|---|
+| `users` | 2 | 2 | 2 | 2 | ✅ Exact match |
+| `companies` | 20 | 20 | 20 | 20 | ✅ Exact match |
+| `recruiters` | 25 | 25 | 25 | 25 | ✅ Exact match |
+| `recruiter_companies` | 25 | 25 | 25 | 25 | ✅ Exact match |
+| `reports` | 35 | 35 | 35 | 35 | ✅ Exact match |
+| `identifiers` | 70 | 70 | 70 | 70 | ✅ Exact match |
+| `report_identifiers` | 107 | 107 | 107 | 107 | ✅ Exact match |
+| `risk_assessments` | 35 | 35 | 35 | 35 | ✅ Exact match |
+| `risk_factors` | 92 | 92 | 92 | 92 | ✅ Exact match |
+| `clusters` | 7 | 7 | 7 | 7 | ✅ Exact match |
+| `cluster_reports` | 22 | 22 | 22 | 22 | ✅ Exact match |
+| `saved_reports` | 3 | 3 | 3 | 3 | ✅ Exact match |
+| `audit_logs` | 30 | 30 | 30 | 30 | ✅ Exact match |
+| `offer_checks` | 0 | 0 | 0 | 0 | ✅ Empty (as required) |
+| `refresh_tokens` | 0 | 0 | 0 | 0 | ✅ Empty (as required) |
+
+### Integrity & Constraint Verification (Zero Violations)
+
+| Check | Expected | Actual Violations | Result |
+|---|---|---|---|
+| Duplicate `(type, normalized_value)` identifiers | 0 | 0 | ✅ PASS |
+| Duplicate `is_current = TRUE` risk assessments per report | 0 | 0 | ✅ PASS (`idx_risk_assessments_current` intact) |
+| Orphaned `cluster_reports` junction rows | 0 | 0 | ✅ PASS |
+| Orphaned `report_identifiers` junction rows | 0 | 0 | ✅ PASS |
+| Orphaned `risk_factors` rows | 0 | 0 | ✅ PASS |
+| Orphaned `recruiter_companies` junction rows | 0 | 0 | ✅ PASS |
+| Orphaned `saved_reports` junction rows | 0 | 0 | ✅ PASS |
+| `audit_logs` missing target constraint (`audit_logs_has_target`) | 0 | 0 | ✅ PASS |
+| `chk_reviewed` constraint on reports | 0 | 0 | ✅ PASS |
+
+### Preservation Confirmations
+
+- ✅ All frontend files untouched (`git diff HEAD -- src/` → empty)
+- ✅ All original mock data files (`src/data/*.js`) untouched
+- ✅ No schema or migration files modified
+- ✅ No destructive SQL executed (`DROP`, `TRUNCATE`, `DELETE`, `deleteMany`, `db push`, `migrate reset`)
+- ✅ No environment secrets printed or staged
+- ✅ Changes not committed or pushed (awaiting review)
+
+---
+
 ## Phase 2A — Backend Foundation ✅ COMPLETE
 
 **Completed:** 2026-11-13
@@ -351,5 +420,5 @@ Located in `backend/node_modules/` — 261 packages total. **Do not reinstall.**
 
 ---
 
-*Last updated: Phase 2B Step 1 complete. Awaiting approval for Phase 2B Step 2 (seed data / API).*
+*Last updated: Phase 3 (Database Seeding) complete. Awaiting approval for Phase 4 (Authentication & Security).*
 
