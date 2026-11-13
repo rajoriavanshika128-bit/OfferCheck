@@ -12,6 +12,7 @@ const helmet  = require('helmet');
 
 const healthRouter = require('./routes/health.routes');
 const authRouter = require('./routes/auth.routes');
+const reportRouter = require('./routes/report.routes');
 const { errorHandler } = require('./utils/errors');
 
 const app = express();
@@ -31,6 +32,7 @@ app.use(express.urlencoded({ extended: false, limit: '50kb' }));
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/reports', reportRouter);
 
 // 404 handler for unmatched routes
 app.use((_req, res) => {
