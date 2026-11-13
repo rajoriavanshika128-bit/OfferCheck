@@ -2,7 +2,7 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 3 (Database Seeding) — ✅ COMPLETE
+**Status:** Phase 4A (Signup, Login & Access Authentication) — ✅ COMPLETE
 
 ---
 
@@ -280,6 +280,72 @@ Directly queried from `offercheck_dev` after completion:
 - ✅ No destructive SQL executed (`DROP`, `TRUNCATE`, `DELETE`, `deleteMany`, `db push`, `migrate reset`)
 - ✅ No environment secrets printed or staged
 - ✅ Changes not committed or pushed (awaiting review)
+
+---
+
+## Phase 4A — Signup, Login & Access Authentication ✅ COMPLETE
+
+**Completed:** 2026-11-13
+
+### Endpoints Implemented
+
+| Endpoint | Method | Middleware | Purpose |
+|---|---|---|---|
+| `/api/auth/signup` | POST | `validate(signupSchema)` | Student registration, email duplicate check, bcrypt cost 12, server-enforced student role, sanitized profile + access token. |
+| `/api/auth/login` | POST | `validate(loginSchema)` | Authenticates normalized email + password, generic error on invalid email/password, ban check, returns sanitized profile + access token. |
+| `/api/auth/me` | GET | `auth` | Protected route: extracts Bearer token, verifies HS256 signature/claims, validates user existence/ban status in DB, returns current sanitized profile. |
+
+### Security Measures Implemented
+
+1. **Algorithm Restriction:** JWT signing and verification strictly locked to `HS256`. Malformed claims (`sub`, `role`, `iat`, `exp`) and unexpected payloads rejected with 401.
+2. **Database Role Enforcement:** Protected requests query PostgreSQL to verify the user exists, is not banned, and attach the current live database role to `req.user.role` (never trusting client body/query params or stale JWT roles).
+3. **Password Security:** Hashes passwords with `bcryptjs` cost factor 12. Generic error returned for both unknown email and incorrect password (prevents email enumeration).
+4. **Role Tamper Protection:** `signup` strictly enforces server-assigned role `student`, ignoring any client-supplied role.
+5. **Account Ban Enforcement:** Banned users (`isBanned: true`) are rejected on login (403) and blocked on protected routes (403).
+6. **Strict Response Sanitization:** Password hashes and internal moderation fields (`isBanned`) are omitted from public user responses; outputs explicitly construct sanitized profiles (`id`, `name`, `email`, `role`, `college`, `createdAt`).
+7. **Bcrypt UTF-8 Byte Limit Enforcement:** Passwords validated with `Buffer.byteLength(val, 'utf8') <= 72` before reaching bcrypt, mitigating silent multi-byte truncation.
+8. **Constant-Time Login Flow:** Unconditionally executes `bcrypt.compare` against a verified pre-computed cost-12 dummy hash for non-existent users, neutralizing timing-attack email enumeration.
+9. **Concurrent Unique Constraint Handling:** Handles Prisma `P2002` violations in `signup()` by mapping them safely to HTTP 409 Conflict without leaking HTTP 500 errors.
+10. **JWT Role Enum Validation:** Strictly validates token `role` claim against `UserRole` enum values (`'student' | 'admin'`) with 401 on unrecognized claims, while maintaining live PostgreSQL user role lookup.
+
+### Verification & Automated Test Results (22 / 22 Passed)
+
+Executed against isolated test database `offercheck_test`:
+
+| # | Test Case | Expected | Result |
+|---|---|---|---|
+| 1 | Signup succeeds & profile sanitized | HTTP 201, sanitized user (no `isBanned`), valid access token | ✅ PASS |
+| 2 | Duplicate signup rejected | HTTP 409 Conflict | ✅ PASS |
+| 3 | Password stored as bcrypt hash (cost 12) | Prefix `$2a$12$` / `$2b$12$`, length 60 | ✅ PASS |
+| 4 | Signup cannot create admin account | Role strictly `student` in DB and response | ✅ PASS |
+| 5 | Login succeeds with correct credentials | HTTP 200, sanitized user (no `isBanned`), valid access token | ✅ PASS |
+| 6 | Incorrect password rejected | HTTP 401, generic invalid credentials message | ✅ PASS |
+| 7 | Nonexistent email receives identical generic error | HTTP 401, identical error message | ✅ PASS |
+| 8 | Student demo account login | HTTP 200 with `student123` credentials (`U001`) | ✅ PASS |
+| 9 | Admin demo account login | HTTP 200 with `admin123` credentials (`U002`) | ✅ PASS |
+| 10 | Valid access token accepted on `/api/auth/me` | HTTP 200, matching profile (no `isBanned`) | ✅ PASS |
+| 11 | Invalid, malformed and expired tokens rejected | HTTP 401 across all malformed variants | ✅ PASS |
+| 12 | Missing or non-Bearer authorization header rejected | HTTP 401 Unauthorized | ✅ PASS |
+| 13 | Banned users rejected | HTTP 403 on login and on protected `/me` | ✅ PASS |
+| 14 | `/api/auth/me` returns strictly sanitized profile | No `passwordHash`, `isBanned` or sensitive fields exposed | ✅ PASS |
+| 15 | Existing admin guard (`requireAdmin`) works | Student blocked (403), Admin allowed (200) | ✅ PASS |
+| 16 | ASCII password at 72-byte limit succeeds | HTTP 201, full 72 ASCII bytes accepted | ✅ PASS |
+| 17 | Multi-byte password within 72 bytes succeeds | HTTP 201, accented characters ('é') accepted | ✅ PASS |
+| 18 | Multi-byte password exceeding 72 bytes rejected | HTTP 400 Validation failed before bcrypt | ✅ PASS |
+| 19 | Valid dummy bcrypt hash verified | Cost-12 dummy hash verified with `bcrypt.compare` | ✅ PASS |
+| 20 | Login paths both execute bcrypt comparison | Both existing (~200ms) and nonexistent (~200ms) execute bcrypt | ✅ PASS |
+| 21 | Concurrent duplicate signup returns HTTP 409 | HTTP 409 on race condition, zero HTTP 500 | ✅ PASS |
+| 22 | Invalid JWT role claims rejected | HTTP 401 on non-enum role claims ('superadmin', 1, '') | ✅ PASS |
+
+### Preservation Confirmations
+
+- ✅ Production development database `offercheck_dev` untouched (all 15 table counts preserved)
+- ✅ All frontend files untouched (`git diff HEAD -- src/` → empty)
+- ✅ All original mock data files (`src/data/*.js`) untouched
+- ✅ All 15 Prisma models and migrations remain unchanged
+- ✅ No new npm packages installed
+- ✅ Frontend production build (`npm run build`) succeeded (0 errors)
+- ✅ Backend lint (`npm run lint`) succeeded (0 errors)
 
 ---
 

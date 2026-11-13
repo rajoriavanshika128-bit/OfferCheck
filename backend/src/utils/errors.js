@@ -21,10 +21,11 @@ class AppError extends Error {
 function errorHandler(err, req, res, _next) {
   // Zod validation errors
   if (err.name === 'ZodError') {
+    const issues = err.issues || err.errors || [];
     return res.status(400).json({
       success: false,
       error: 'Validation failed',
-      details: err.errors.map(e => ({ field: e.path.join('.'), message: e.message })),
+      details: issues.map(e => ({ field: e.path ? e.path.join('.') : '', message: e.message })),
     });
   }
 

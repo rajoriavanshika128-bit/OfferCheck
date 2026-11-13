@@ -12,7 +12,7 @@
     "prisma:migrate": "dotenv run -q -f ../.env -- prisma migrate dev",
     "prisma:studio": "dotenv run -q -f ../.env -- prisma studio",
     "prisma:seed": "dotenv run -q -f ../.env -- prisma db seed",
-    "lint": "node --check src/server.js src/app.js src/utils/prisma.js src/utils/errors.js src/middleware/auth.js src/middleware/requireAdmin.js src/middleware/validate.js src/routes/health.routes.js"
+    "lint": "node --check src/server.js src/app.js src/utils/prisma.js src/utils/errors.js src/middleware/auth.js src/middleware/requireAdmin.js src/middleware/validate.js src/routes/health.routes.js src/routes/auth.routes.js src/controllers/auth.controller.js src/services/auth.service.js src/services/token.service.js src/validations/auth.validation.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
