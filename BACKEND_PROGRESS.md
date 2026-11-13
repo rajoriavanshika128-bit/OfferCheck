@@ -2,7 +2,96 @@
 
 **Project:** OfferCheck — Internship & Job Fraud Intelligence Platform  
 **Location:** `/Users/vanshikarajoria/Desktop/offercheck`  
-**Status:** Phase 4C (RBAC, Ownership & Privacy Utilities) — ✅ COMPLETE (Stage 1 & 2)
+**Status:** Phase 4D (Permanent Regression Test Infrastructure & Integration Suite) — ✅ COMPLETE
+
+---
+
+## Phase 4D — Permanent Regression Infrastructure & Database-Backed Integration Suite ✅ COMPLETE
+
+**Completed:** 2026-11-14
+
+### Summary of Implementation
+
+Phase 4D establishes a hardened, permanent automated testing infrastructure and formalizes database-backed regression verification across Phase 4A (Authentication), Phase 4B (Refresh Tokens, Concurrency & Suspension), and Phase 4C (RBAC & Live Authorization):
+
+1. **Pre-flight Database Safety Guard (`backend/test/helpers/testDbGuard.js`):**
+   - Validates database connection strings prior to application import or Prisma initialization.
+   - Enforces approved protocols (`postgresql:`, `postgres:`).
+   - Enforces approved local hosts (`localhost`, `127.0.0.1`, `::1` with bracket normalization).
+   - Enforces exact database name: `offercheck_test` (`REQUIRED_DB_NAME`).
+   - Keyword blacklist strictly blocks targets containing `dev`, `prod`, or `stage` (preventing accidental connection to or corruption of `offercheck_dev` or production).
+   - Validated via 10 standalone, memory-only unit tests (`backend/test/helpers/testDbGuard.test.js`).
+
+2. **Formalized Integration Test Runner (`backend/test/integration/phase4_regression.test.js`):**
+   - Accepts **ONLY** `process.env.TEST_DATABASE_URL` (no fallback to `DATABASE_URL` or `.env`; exits with non-zero status code if omitted).
+   - Pre-injects `process.env.DATABASE_URL = guard.url` before importing modules, bypassing automatic `.env` loading in `src/utils/prisma.js`.
+   - Uses the shared `PrismaClient` singleton from `src/utils/prisma.js` for both test queries and Express middleware, ensuring single connection pool lifecycle.
+   - Dedicated Express test application (`testRbacApp`) mounts test verification routes *before* the terminal 404 handler, testing genuine HTTP requests against production middleware (`auth`, `requireAdmin`) without modifying production `src/app.js`.
+   - Non-destructive teardown: tracks created record IDs via `createdUserIds = new Set()` and cleans up only test-created records (`where: { userId: { in: ids } }`). Never executes `TRUNCATE`, `DROP`, or table-wide resets.
+   - Transparent error logging: collects and reports all test failures, ensures teardown executes even after failures, and guarantees non-zero exit status (`process.exitCode = 1`) on any failure.
+
+3. **Package Test Scripts (`backend/package.json`):**
+   - `"test:unit"`: Executes memory-only unit tests (`testDbGuard.test.js` and `phase4c_unit.test.js`). Requires zero network, zero database.
+   - `"test:integration"`: Executes `phase4_regression.test.js`. Requires valid `TEST_DATABASE_URL` targeting `offercheck_test`.
+   - `"test"`: Chains `test:unit && test:integration`. Fails cleanly without false-positive passes if integration configuration is missing.
+   - `"lint"`: Syntax validation script (`node --check`) across all 20 backend source and test files.
+
+### Test Provenance & Authenticity
+
+- **Cases 1–35 (Phases 4A & 4B):**
+  - Originally executed in transient scratch runners during earlier development and not committed to Git.
+  - Reconstructed from documented test matrices and assertions in `BACKEND_PROGRESS.md`.
+  - Case 20 hardened to deterministically verify that `bcrypt.compare` executes with the pre-computed cost-12 dummy hash on non-existent user login paths (constant-time email enumeration mitigation).
+- **Cases 36–39 (Phase 4C):**
+  - Newly introduced in Phase 4D to verify live Express HTTP middleware authorization (`requireAdmin`), live database role demotion with stale JWT, and JWT signature tampering.
+
+### Database Environment & Migration Verification
+
+- **Environment:** Dedicated PostgreSQL 18.6 instance on `127.0.0.1:5432`.
+- **Target Database:** `offercheck_test` (created and verified empty prior to migration).
+- **Baseline Migration Applied:** `20261113082200_init` applied via Prisma CLI 6.19.3 (`prisma migrate deploy --schema=./prisma/schema.prisma`).
+- **Isolated Migration Execution:** Executed from an isolated temporary workspace (`/tmp/offercheck_migration_sandbox`) containing only schema and migration DDL files, ensuring Prisma CLI could not discover or load the project's root `.env`.
+- **Verified Schema State:**
+  - 15 application tables + `_prisma_migrations` tracking table (total 16).
+  - 7 custom PostgreSQL enums (`UserRole`, `ReportStatus`, `IdentifierType`, `ConfidenceLevel`, `RiskCategory`, `ClusterStatus`, `AuditAction`).
+  - 21 indexes (including partial unique index `idx_risk_assessments_current` and partial index `idx_refresh_tokens_active`).
+  - 22 foreign keys and 2 check constraints (`chk_reviewed`, `audit_logs_has_target`).
+- **Database Isolation:** `offercheck_dev` was **NEVER contacted** during migration deployment or integration test execution.
+
+### Actual Verification Results
+
+| Test Suite | Total | Passed | Skipped | Failed | Details |
+|---|---|---|---|---|---|
+| **Database Guard Unit Tests** | 10 | 10 | 0 | 0 | Protocol checks, host checks, IPv6 normalization, `offercheck_dev` rejection, valid local URL acceptance |
+| **Phase 4C Pure Unit Tests** | 31 | 31 | 0 | 0 | RBAC middleware, ownership helpers, self-action protections, PII masking |
+| **Total Unit Tests (`npm run test:unit`)** | **41** | **41** | **0** | **0** | **100% PASS** (memory-only, database-independent) |
+| **Phase 4 Integration Suite (`npm run test:integration`)** | **39** | **37** | **2** | **0** | **100% of executable cases PASS** |
+| — Phase 4A Authentication (Cases 1–22) | 22 | 20 | 2 | 0 | Cases 8 & 9 skipped (exact demo fixtures absent); 20 passed |
+| — Phase 4B Token Lifecycle (Cases 23–35) | 13 | 13 | 0 | 0 | Rotation, reuse revocation, concurrency, `FOR UPDATE`, cascade delete |
+| — Phase 4C HTTP RBAC (Cases 36–39) | 4 | 4 | 0 | 0 | Student 403, Admin 200, live DB role demotion 403, tampered signature 401 |
+| **Backend Syntax Check (`npm run lint`)** | 20 files | 20 | 0 | 0 | JavaScript syntax validation (`node --check`) across all 20 backend source and test files (exit code 0) |
+
+#### Honest Skipped Test Accounting (Cases 8 & 9)
+- **Case 8 (Student demo account login):** Checks for exact fixture `student@demo.offercheck` (`U001`). Reported **SKIPPED** because fixture was absent in unseeded `offercheck_test`.
+- **Case 9 (Admin demo account login):** Checks for exact fixture `admin@demo.offercheck` (`U002`). Reported **SKIPPED** because fixture was absent in unseeded `offercheck_test`.
+- Skipped tests incremented `skippedTests` and `totalTests`; they were **NOT** counted as passed.
+
+#### Post-Test Database Cleanup Verification
+Direct query on `offercheck_test` immediately following test teardown:
+- `SELECT count(*) FROM users;` → **0**
+- `SELECT count(*) FROM refresh_tokens;` → **0**
+- Both test HTTP servers closed and Prisma disconnected cleanly.
+
+### Environment & Secret Protection Notes
+- No secret values or credentials were exposed or committed.
+- Migration and integration suites used explicit local connection strings (`TEST_DATABASE_URL`) without relying on the root `.env`.
+- **Transparency Note:** During an earlier CLI version probe from the project root (`prisma --version`), Prisma CLI reported `Environment variables loaded from .env`. No environment variable values were printed, no database connection was initiated, and no database records were modified during that check.
+
+### Deferred Endpoint Integrations
+As established in Phase 4C, endpoint-level integration of ownership checks (`assertOwnership`) and PII sanitization (`maskReportForRole`, `maskIdentifierForRole`) remain strictly deferred until the corresponding endpoints are built in later phases:
+- **Phase 5:** Reports (`GET /api/reports`, `POST /api/reports`), checks (`POST /api/checks`), bookmarks (`saved_reports`).
+- **Phase 6:** Identifier details (`GET /api/identifiers`).
+- **Phase 8:** Administrative moderation (`PATCH /api/admin/users/:id/ban`, `PATCH /api/admin/reports/:id`).
 
 ---
 
@@ -77,7 +166,7 @@ Executed via standalone test suite `backend/test/phase4c_unit.test.js`:
 - **Unit Layer:** 31 / 31 unit tests passed with mocked objects (zero network, zero DB access).
 - **Prisma Schema:** Validated via `npx prisma validate --schema=prisma/schema.prisma` (schema is valid 🚀).
 - **Syntax & Lint:** Validated via `npm run lint` across all 16 backend source files (exit code 0).
-- **Database Integration Tests:** Deferred. Database-backed integration tests against `offercheck_test` require an explicitly configured, safe test database environment variable and were not run to prevent any connection to `.env` or `offercheck_dev`.
+- **Database Integration Tests:** Formalized, automated, and verified in Phase 4D against dedicated database `offercheck_test` (37 passed, 2 skipped, 0 failed).
 
 ---
 
