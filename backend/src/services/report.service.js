@@ -781,8 +781,12 @@ async function getAdminReports(queryOptions = {}, callerRole = 'admin') {
 
   const where = {};
 
-  // Default admin listing filter is 'pending'
-  where.status = queryOptions.status || 'pending';
+  // When status is 'all', do not restrict by status. Otherwise default to 'pending'
+  if (queryOptions.status === 'all') {
+    // Unrestricted across all statuses
+  } else {
+    where.status = queryOptions.status || 'pending';
+  }
 
   if (queryOptions.search && queryOptions.search.trim()) {
     const term = queryOptions.search.trim();

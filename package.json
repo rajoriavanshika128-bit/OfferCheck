@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "node test/api_auth.test.js && node test/dashboard_service.test.js && node test/report_service.test.js",
+    "test": "node test/api_auth.test.js && node test/dashboard_service.test.js && node test/report_service.test.js && node test/admin_service.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
