@@ -741,6 +741,256 @@ async function getRelatedReports(reportId, currentUser = null) {
   };
 }
 
+/**
+ * Permitted status transitions for Phase 8 Admin Moderation.
+ * Terminal states (verified, rejected) cannot be transitioned.
+ */
+const PERMITTED_MODERATION_TRANSITIONS = Object.freeze({
+  pending: ['verified', 'rejected', 'investigating'],
+  investigating: ['verified', 'rejected'],
+  verified: [],
+  rejected: [],
+});
+
+/**
+ * Retrieve paginated reports for administrators across moderation statuses.
+ * Default filter is status = 'pending' (the moderation queue).
+ *
+ * @param {object} [queryOptions={}] - Validated query parameters
+ * @param {string} [callerRole='admin'] - Role of requesting user
+ * @returns {Promise<{ reports: Array<object>, pagination: object }>}
+ */
+async function getAdminReports(queryOptions = {}, callerRole = 'admin') {
+  if (callerRole !== 'admin') {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const page = Number(queryOptions.page) || 1;
+  const limit = Number(queryOptions.limit) || 20;
+  const skip = (page - 1) * limit;
+
+  const primarySortField = queryOptions.sortBy === 'companyName'
+    ? 'companyNameRaw'
+    : (queryOptions.sortBy || 'submittedAt');
+  const sortDirection = (queryOptions.sortOrder || 'desc').toLowerCase();
+
+  const orderBy = [
+    { [primarySortField]: sortDirection },
+    { id: 'asc' }, // Stable tie-breaker
+  ];
+
+  const where = {};
+
+  // Default admin listing filter is 'pending'
+  where.status = queryOptions.status || 'pending';
+
+  if (queryOptions.search && queryOptions.search.trim()) {
+    const term = queryOptions.search.trim();
+    where.OR = [
+      { companyNameRaw: { contains: term, mode: 'insensitive' } },
+      { recruiterNameRaw: { contains: term, mode: 'insensitive' } },
+      { domainRaw: { contains: term, mode: 'insensitive' } },
+    ];
+  }
+
+  if (queryOptions.companyId) {
+    where.companyId = queryOptions.companyId;
+  }
+
+  if (queryOptions.recruiterId) {
+    where.recruiterId = queryOptions.recruiterId;
+  }
+
+  if (queryOptions.identifierType && queryOptions.identifierValue) {
+    let normalized = queryOptions.identifierValue.trim();
+    try {
+      normalized = normalizeIdentifier(queryOptions.identifierType, normalized);
+    } catch {
+      normalized = normalized.toLowerCase();
+    }
+
+    where.identifiers = {
+      some: {
+        identifier: {
+          type: queryOptions.identifierType,
+          normalizedValue: normalized,
+        },
+      },
+    };
+  }
+
+  const [total, reports] = await Promise.all([
+    prisma.report.count({ where }),
+    prisma.report.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: {
+        company: { select: { id: true, name: true, domain: true, flagged: true } },
+        recruiter: true,
+        submitter: { select: { id: true, name: true, college: true, role: true } },
+        reviewer: { select: { id: true, name: true, role: true } },
+        riskAssessments: {
+          where: { isCurrent: true },
+          select: { id: true, score: true, category: true, summary: true, assessedAt: true },
+        },
+        identifiers: {
+          include: {
+            identifier: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const sanitizedReports = reports.map((r) => maskReportForRole(r, 'admin'));
+
+  return {
+    reports: sanitizedReports,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
+/**
+ * Execute an atomic report moderation status transition.
+ *
+ * Rules:
+ * - Reviewer ID is derived strictly from server-authenticated adminId.
+ * - Same-status requests throw HTTP 409 Conflict.
+ * - Attempts to modify finalized verified/rejected reports throw HTTP 400 Bad Request.
+ * - Uses conditional updateMany with the expected current status to prevent concurrent races.
+ * - Verifies affected row count === 1. If 0, throws HTTP 409 Conflict without writing audit log.
+ * - Creates STATUS_CHANGED AuditLog row in the same transaction.
+ *
+ * @param {string} reportId - Target report UUID
+ * @param {string} targetStatus - Target status ('verified', 'rejected', 'investigating')
+ * @param {string} adminId - Authenticated administrator user ID
+ * @param {string|null} [notes=null] - Optional moderation notes
+ * @returns {Promise<{ report: object, auditLog: object }>}
+ */
+async function moderateReport(reportId, targetStatus, adminId, notes = null) {
+  if (!reportId || typeof reportId !== 'string') {
+    throw new AppError('Report ID is required and must be a string', 400);
+  }
+  if (!adminId || typeof adminId !== 'string') {
+    throw new AppError('Admin ID is required and must be a string', 400);
+  }
+  if (!['verified', 'rejected', 'investigating'].includes(targetStatus)) {
+    throw new AppError('Invalid target moderation status', 400);
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Fetch current report status inside the transaction
+    const currentReport = await tx.report.findUnique({
+      where: { id: reportId },
+      select: {
+        id: true,
+        status: true,
+        companyNameRaw: true,
+        reviewedBy: true,
+        reviewedAt: true,
+      },
+    });
+
+    if (!currentReport) {
+      throw new AppError('Report not found', 404);
+    }
+
+    // 2. Same-status request returns 409 Conflict
+    if (currentReport.status === targetStatus) {
+      throw new AppError(`Report is already ${targetStatus}`, 409);
+    }
+
+    // 3. Finalized status check: verified / rejected cannot be modified
+    if (currentReport.status === 'verified' || currentReport.status === 'rejected') {
+      const message = currentReport.status === 'verified'
+        ? 'Verified reports are finalized and cannot be modified'
+        : 'Rejected reports are finalized and cannot be reopened';
+      throw new AppError(message, 400);
+    }
+
+    // 4. Permitted status transition check
+    const allowedTargets = PERMITTED_MODERATION_TRANSITIONS[currentReport.status] || [];
+    if (!allowedTargets.includes(targetStatus)) {
+      throw new AppError(
+        `Invalid status transition from '${currentReport.status}' to '${targetStatus}'`,
+        400
+      );
+    }
+
+    const expectedCurrentStatus = currentReport.status;
+    const now = new Date();
+    const isVerified = targetStatus === 'verified';
+
+    // 5. Conditional updateMany protecting against concurrent moderation
+    const updateResult = await tx.report.updateMany({
+      where: {
+        id: reportId,
+        status: expectedCurrentStatus,
+      },
+      data: {
+        status: targetStatus,
+        isVerified,
+        reviewedBy: adminId,
+        reviewedAt: now,
+      },
+    });
+
+    // 6. Check affected row count: must be exactly 1
+    if (updateResult.count === 0) {
+      throw new AppError(
+        'Report was modified by another administrator or is no longer in expected status',
+        409
+      );
+    }
+
+    // 7. Create STATUS_CHANGED AuditLog entry inside the same transaction
+    const auditLog = await tx.auditLog.create({
+      data: {
+        actorId: adminId,
+        action: 'STATUS_CHANGED',
+        reportId: currentReport.id,
+        oldValue: expectedCurrentStatus,
+        newValue: targetStatus,
+        notes: notes && typeof notes === 'string' && notes.trim()
+          ? notes.trim()
+          : `Status updated from ${expectedCurrentStatus} to ${targetStatus}`,
+      },
+    });
+
+    // 8. Fetch full updated report graph with relations for response
+    const updatedReport = await tx.report.findUnique({
+      where: { id: reportId },
+      include: {
+        company: { select: { id: true, name: true, domain: true, flagged: true } },
+        recruiter: true,
+        submitter: { select: { id: true, name: true, college: true, role: true } },
+        reviewer: { select: { id: true, name: true, role: true } },
+        riskAssessments: {
+          where: { isCurrent: true },
+          select: { id: true, score: true, category: true, summary: true, assessedAt: true },
+        },
+        identifiers: {
+          include: {
+            identifier: true,
+          },
+        },
+      },
+    });
+
+    return {
+      report: maskReportForRole(updatedReport, 'admin'),
+      auditLog,
+    };
+  });
+}
+
 module.exports = {
   createReport,
   getPublicReports,
@@ -750,4 +1000,7 @@ module.exports = {
   removeSavedReport,
   getUserSavedReports,
   getRelatedReports,
+  getAdminReports,
+  moderateReport,
+  PERMITTED_MODERATION_TRANSITIONS,
 };

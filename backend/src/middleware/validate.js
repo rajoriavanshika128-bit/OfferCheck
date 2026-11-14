@@ -33,12 +33,28 @@ function validateQuery(schema) {
   };
 }
 
+function validateParams(schema) {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      // Pass ZodError to centralised errorHandler
+      return next(result.error);
+    }
+    req.params = result.data; // replace with parsed + validated data
+    next();
+  };
+}
+
 validate.validate = validate;
 validate.validateQuery = validateQuery;
 validate.query = validateQuery;
+validate.validateParams = validateParams;
+validate.params = validateParams;
 
 module.exports = validate;
 module.exports.validate = validate;
 module.exports.validateQuery = validateQuery;
 module.exports.query = validateQuery;
+module.exports.validateParams = validateParams;
+module.exports.params = validateParams;
 

@@ -14,6 +14,7 @@ const healthRouter = require('./routes/health.routes');
 const authRouter = require('./routes/auth.routes');
 const reportRouter = require('./routes/report.routes');
 const checkRouter = require('./routes/check.routes');
+const adminRouter = require('./routes/admin.routes');
 const { errorHandler } = require('./utils/errors');
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/reports', reportRouter);
 app.use('/api/checks', checkRouter);
+app.use('/api/admin', adminRouter);
 
 // 404 handler for unmatched routes
 app.use((_req, res) => {

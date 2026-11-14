@@ -254,6 +254,104 @@ async function getSavedReports(req, res, next) {
   }
 }
 
+/**
+ * GET /api/admin/reports
+ * Retrieve paginated reports for administrators across moderation statuses.
+ */
+async function getAdminReports(req, res, next) {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return next(new AppError('Admin access required', 403));
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getAdminReports !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.getAdminReports(req.query, req.user.role);
+
+    return res.status(200).json({
+      success: true,
+      reports: result.reports,
+      pagination: result.pagination,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/admin/reports/:id
+ * Retrieve unmasked report details for administrators before moderation.
+ */
+async function getAdminReportById(req, res, next) {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return next(new AppError('Admin access required', 403));
+    }
+
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getReportById !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const report = await reportService.getReportById(paramResult.data.id, req.user);
+
+    return res.status(200).json({
+      success: true,
+      report,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/admin/reports/:id
+ * Atomic report moderation decision (verify, reject, investigate).
+ */
+async function moderateReport(req, res, next) {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return next(new AppError('Admin access required', 403));
+    }
+
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.moderateReport !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const { status, notes } = req.body;
+    const adminId = req.user.id;
+
+    const result = await reportService.moderateReport(
+      paramResult.data.id,
+      status,
+      adminId,
+      notes
+    );
+
+    return res.status(200).json({
+      success: true,
+      report: result.report,
+      auditLog: result.auditLog,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   submitReport,
   getReports,
@@ -263,4 +361,7 @@ module.exports = {
   saveReport,
   removeSavedReport,
   getSavedReports,
+  getAdminReports,
+  getAdminReportById,
+  moderateReport,
 };

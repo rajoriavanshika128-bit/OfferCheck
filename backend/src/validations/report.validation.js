@@ -37,6 +37,13 @@ const REPORT_STATUSES = Object.freeze([
   'investigating',
 ]);
 
+// Permitted moderation target statuses for Phase 8
+const MODERATION_STATUSES = Object.freeze([
+  'verified',
+  'rejected',
+  'investigating',
+]);
+
 // Actual scalar sorting fields supported by Prisma Report model
 const PRISMA_REPORT_SORT_FIELDS = Object.freeze([
   'submittedAt',
@@ -452,8 +459,34 @@ const savedReportsQuerySchema = z
   })
   .strict();
 
+/**
+ * Report moderation body schema (PATCH /api/admin/reports/:id).
+ *
+ * Rules:
+ * - Compatible with Zod 4 syntax.
+ * - status must be one of MODERATION_STATUSES ('verified', 'rejected', 'investigating').
+ * - notes is optional string with max 1000 characters.
+ * - Strict rejection of unexpected properties (reviewerId, reviewedBy, etc.).
+ */
+const moderateReportSchema = z
+  .object({
+    status: z.enum(MODERATION_STATUSES, {
+      message: 'Status must be verified, rejected, or investigating',
+    }),
+    notes: z
+      .string({
+        message: 'Notes must be a string',
+      })
+      .trim()
+      .max(1000, 'Notes cannot exceed 1000 characters')
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
 module.exports = {
   REPORT_STATUSES,
+  MODERATION_STATUSES,
   PRISMA_REPORT_SORT_FIELDS,
   SORT_FIELD_INPUTS,
   createReportSchema,
@@ -461,6 +494,7 @@ module.exports = {
   adminReportQuerySchema,
   reportQuerySchema,
   reportIdParamSchema,
+  moderateReportSchema,
   myReportsQuerySchema,
   savedReportsQuerySchema,
 };
