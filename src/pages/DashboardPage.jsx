@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Search, AlertTriangle, AlertCircle, TrendingUp, FileText, Shield } from 'lucide-react';
 import { PageLayout } from '../components/layout/PageLayout';
@@ -35,6 +35,33 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Only the explicit isNewUser signup navigation flag activates the first-time greeting
+  const [isFirstVisit] = useState(() => Boolean(location.state?.isNewUser));
+
+  const stateConsumedRef = useRef(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const storageKey = `offercheck_visited_${user.id}`;
+    const isNewUserFromState = Boolean(location.state?.isNewUser);
+
+    // Initialise or update account-specific visit marker safely
+    try {
+      localStorage.setItem(storageKey, 'true');
+    } catch {
+      // Safe fallback if localStorage is restricted or unavailable
+    }
+
+    // Consume and clear the isNewUser navigation state via replace navigation
+    if (isNewUserFromState && !stateConsumedRef.current) {
+      stateConsumedRef.current = true;
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [user?.id, location.pathname, location.state, navigate]);
+
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -107,7 +134,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-7">
         <h1 className="text-2xl font-bold text-[#f0ede8]">
-          Welcome back, {user?.name ? user.name.split(' ')[0] : 'Student'}
+          {isFirstVisit ? 'Welcome' : 'Welcome back'}, {user?.name?.trim() ? user.name.trim().split(' ')[0] : 'Student'}!
         </h1>
         <p className="text-sm text-[#6b6460] mt-1">{todayLabel}</p>
       </div>

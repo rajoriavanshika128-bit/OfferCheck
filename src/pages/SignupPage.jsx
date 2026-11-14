@@ -46,7 +46,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signup(form.name.trim(), form.email.trim(), form.password, form.college.trim());
-      navigate('/dashboard');
+      navigate('/dashboard', { state: { isNewUser: true } });
     } catch (err) {
       setErrors({ general: err.message });
     } finally {
