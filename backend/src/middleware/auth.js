@@ -87,4 +87,25 @@ async function auth(req, _res, next) {
   }
 }
 
+/**
+ * Optional authentication middleware for dual-mode routes.
+ * An absent Authorization header allows anonymous access (req.user = null).
+ * Any supplied header must pass through auth() and is strictly rejected if invalid.
+ */
+function optionalAuth(req, res, next) {
+  const header = req.headers.authorization;
+
+  if (header === undefined || header === null) {
+    req.user = null;
+    return next();
+  }
+
+  return auth(req, res, next);
+}
+
+auth.auth = auth;
+auth.optionalAuth = optionalAuth;
+
 module.exports = auth;
+module.exports.auth = auth;
+module.exports.optionalAuth = optionalAuth;

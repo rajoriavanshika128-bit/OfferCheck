@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizeUpi } = require('./normalize');
+
 /**
  * src/utils/privacy.js
  * Server-side privacy-by-design PII masking engine.
@@ -48,7 +50,10 @@ function maskEmail(email) {
 }
 
 /**
- * Mask a UPI ID (e.g. "fraudster@upi" -> "f******er@upi").
+ * Mask a UPI ID (e.g. "fraudster@upi" -> "f******er@upi", "ab@okaxis" -> "a*@okaxis").
+ * Ensures short valid usernames (2 and 3 characters) and malformed inputs are safely masked.
+ * Non-string, null, or whitespace-only inputs return null.
+ * Invalid non-empty inputs (e.g. multiple '@', spaces, missing username/handle) return '*****'.
  *
  * @param {string|null} upi
  * @returns {string|null}
@@ -56,9 +61,31 @@ function maskEmail(email) {
 function maskUpi(upi) {
   if (!upi || typeof upi !== 'string') return null;
   const trimmed = upi.trim();
+  if (!trimmed) return null;
+
+  // Validate format against NPCI specifications via normalizeUpi.
+  // Invalid non-empty strings (e.g. multiple '@', spaces, missing handle) must never leak raw text.
+  try {
+    normalizeUpi(trimmed);
+  } catch {
+    return '*****';
+  }
+
   const atIdx = trimmed.indexOf('@');
-  if (atIdx === -1 || atIdx < 3) return trimmed;
-  return trimmed[0] + '*'.repeat(atIdx - 3) + trimmed.slice(atIdx - 2);
+  const username = trimmed.slice(0, atIdx);
+  const handle = trimmed.slice(atIdx);
+
+  if (username.length === 1) {
+    return `*${handle}`;
+  }
+  if (username.length === 2) {
+    return `${username[0]}*${handle}`;
+  }
+  if (username.length === 3) {
+    return `${username[0]}*${username[2]}${handle}`;
+  }
+
+  return username[0] + '*'.repeat(username.length - 3) + username.slice(-2) + handle;
 }
 
 /**

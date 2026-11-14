@@ -407,6 +407,51 @@ const reportIdParamSchema = z
   })
   .strict();
 
+/**
+ * User submitted reports query schema (GET /api/reports/me).
+ * Allows author to view their own reports across all statuses.
+ */
+const myReportsQuerySchema = z
+  .object({
+    page: pageQuerySchema,
+    limit: limitQuerySchema,
+    status: z
+      .enum(REPORT_STATUSES, {
+        message: 'Invalid report status filter',
+      })
+      .optional(),
+    search: optionalSearchString(100, 'Search term'),
+    sortBy: reportSortBySchema,
+    sortOrder: z
+      .enum(SORT_DIRECTIONS, {
+        message: 'Sort order must be asc or desc',
+      })
+      .transform((val) => val.toLowerCase())
+      .default('desc'),
+  })
+  .strict();
+
+/**
+ * Saved reports query schema (GET /api/reports/saved).
+ */
+const savedReportsQuerySchema = z
+  .object({
+    page: pageQuerySchema,
+    limit: limitQuerySchema,
+    sortBy: z
+      .enum(['savedAt'], {
+        message: 'Invalid sort field for saved reports',
+      })
+      .default('savedAt'),
+    sortOrder: z
+      .enum(SORT_DIRECTIONS, {
+        message: 'Sort order must be asc or desc',
+      })
+      .transform((val) => val.toLowerCase())
+      .default('desc'),
+  })
+  .strict();
+
 module.exports = {
   REPORT_STATUSES,
   PRISMA_REPORT_SORT_FIELDS,
@@ -416,4 +461,6 @@ module.exports = {
   adminReportQuerySchema,
   reportQuerySchema,
   reportIdParamSchema,
+  myReportsQuerySchema,
+  savedReportsQuerySchema,
 };

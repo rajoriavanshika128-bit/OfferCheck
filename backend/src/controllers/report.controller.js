@@ -8,6 +8,7 @@
 const path = require('path');
 const fs = require('fs');
 const { AppError } = require('../utils/errors');
+const { reportIdParamSchema } = require('../validations/report.validation');
 
 const REPORT_SERVICE_PATH = path.resolve(__dirname, '../services/report.service.js');
 
@@ -58,6 +59,208 @@ async function submitReport(req, res, next) {
   }
 }
 
+/**
+ * GET /api/reports
+ * Public verified-report discovery (browse, search, filter, paginate).
+ */
+async function getReports(req, res, next) {
+  try {
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getPublicReports !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const callerRole = req.user ? req.user.role : 'student';
+    const result = await reportService.getPublicReports(req.query, callerRole);
+
+    return res.status(200).json({
+      success: true,
+      reports: result.reports,
+      pagination: result.pagination,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/reports/me
+ * Retrieve the authenticated user's submitted reports across all statuses.
+ */
+async function getMyReports(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getMyReports !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.getMyReports(req.user.id, req.query, req.user.role);
+
+    return res.status(200).json({
+      success: true,
+      reports: result.reports,
+      pagination: result.pagination,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/reports/:id
+ * Retrieve a single report by ID (verified public, non-verified author/admin).
+ */
+async function getReportById(req, res, next) {
+  try {
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getReportById !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const report = await reportService.getReportById(paramResult.data.id, req.user || null);
+
+    return res.status(200).json({
+      success: true,
+      report,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/reports/:id/related
+ * Retrieve related verified reports sharing contact identifiers with source report.
+ */
+async function getRelatedReports(req, res, next) {
+  try {
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getRelatedReports !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.getRelatedReports(paramResult.data.id, req.user || null);
+
+    return res.status(200).json({
+      success: true,
+      sourceReportId: result.sourceReportId,
+      relatedReports: result.relatedReports,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/reports/:id/save
+ * Bookmark / save a report idempotently for the authenticated user.
+ */
+async function saveReport(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.saveReport !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.saveReport(req.user.id, paramResult.data.id, req.user);
+
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /api/reports/:id/save
+ * Remove a saved report bookmark idempotently.
+ */
+async function removeSavedReport(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const paramResult = reportIdParamSchema.safeParse(req.params);
+    if (!paramResult.success) {
+      return next(paramResult.error);
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.removeSavedReport !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.removeSavedReport(req.user.id, paramResult.data.id);
+
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/reports/saved
+ * Retrieve saved reports for the authenticated user with non-public leak protection.
+ */
+async function getSavedReports(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const reportService = getReportService();
+    if (!reportService || typeof reportService.getUserSavedReports !== 'function') {
+      return next(new AppError('Report service not implemented', 501));
+    }
+
+    const result = await reportService.getUserSavedReports(req.user.id, req.query, req.user.role);
+
+    return res.status(200).json({
+      success: true,
+      reports: result.reports,
+      pagination: result.pagination,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   submitReport,
+  getReports,
+  getMyReports,
+  getReportById,
+  getRelatedReports,
+  saveReport,
+  removeSavedReport,
+  getSavedReports,
 };

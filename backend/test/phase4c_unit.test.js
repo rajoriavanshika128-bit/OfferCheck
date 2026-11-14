@@ -195,9 +195,47 @@ runTest('maskEmail masks local part correctly and handles null/malformed inputs'
 runTest('maskUpi masks identifier and preserves provider domain', () => {
   assert.strictEqual(maskUpi('fraudster@upi'), 'f******er@upi');
   assert.strictEqual(maskUpi('payhere@upi'), 'p****re@upi');
-  assert.strictEqual(maskUpi('ab@okaxis'), 'ab@okaxis');
+  assert.strictEqual(maskUpi('abcd@upi'), 'a*cd@upi');
+  assert.strictEqual(maskUpi('ab@okaxis'), 'a*@okaxis');
   assert.strictEqual(maskUpi(null), null);
   assert.strictEqual(maskUpi(''), null);
+});
+
+runTest('maskUpi masks short valid UPI usernames (2- and 3-character)', () => {
+  // 2-character usernames
+  assert.strictEqual(maskUpi('ab@okaxis'), 'a*@okaxis');
+  assert.strictEqual(maskUpi('xy@okhdfcbank'), 'x*@okhdfcbank');
+  assert.strictEqual(maskUpi('99@upi'), '9*@upi');
+
+  // 3-character usernames
+  assert.strictEqual(maskUpi('abc@okaxis'), 'a*c@okaxis');
+  assert.strictEqual(maskUpi('pay@upi'), 'p*y@upi');
+  assert.strictEqual(maskUpi('hr1@icici'), 'h*1@icici');
+});
+
+runTest('maskUpi safely handles malformed and edge-case inputs without exposing sensitive values', () => {
+  // Null, undefined, empty, non-string
+  assert.strictEqual(maskUpi(null), null);
+  assert.strictEqual(maskUpi(undefined), null);
+  assert.strictEqual(maskUpi(''), null);
+  assert.strictEqual(maskUpi('   '), null);
+  assert.strictEqual(maskUpi(12345), null);
+  assert.strictEqual(maskUpi({}), null);
+
+  // Missing @ symbol (must never leak raw string)
+  assert.strictEqual(maskUpi('invalid-upi'), '*****');
+  assert.strictEqual(maskUpi('9876543210'), '*****');
+  assert.strictEqual(maskUpi('secretpassword'), '*****');
+
+  // Multiple @ characters (must never leak raw string)
+  assert.strictEqual(maskUpi('user@okaxis@extra'), '*****');
+  assert.strictEqual(maskUpi('foo@bar@baz'), '*****');
+
+  // Invalid username/handle formats (must never leak raw string)
+  assert.strictEqual(maskUpi('@okaxis'), '*****');
+  assert.strictEqual(maskUpi('user@'), '*****');
+  assert.strictEqual(maskUpi('user @okaxis'), '*****');
+  assert.strictEqual(maskUpi('@'), '*****');
 });
 
 runTest('maskBankAccount masks bank account and preserves last 4 digits', () => {
@@ -542,6 +580,69 @@ runTest('maskIdentifierForRole strictly does not mutate original frozen identifi
   const result = maskIdentifierForRole(frozenIdentifier, 'student');
   assert.strictEqual(result.value, 's***@domain.com');
   assert.strictEqual(frozenIdentifier.value, 'secret@domain.com');
+});
+
+runTest('maskIdentifierForRole handles UPI correctly for both student and admin roles', () => {
+  const shortUpi = {
+    type: 'upi',
+    value: 'ab@okaxis',
+    normalizedValue: 'ab@okaxis',
+  };
+  const threeCharUpi = {
+    type: 'upi',
+    value: 'pay@upi',
+    normalizedValue: 'pay@upi',
+  };
+  const malformedUpi = {
+    type: 'upi',
+    value: 'malformedupi',
+    normalizedValue: 'malformedupi',
+  };
+  const multiAtUpi = {
+    type: 'upi',
+    value: 'foo@bar@baz',
+    normalizedValue: 'foo@bar@baz',
+  };
+
+  // Student role: must mask short UPIs and malformed inputs
+  const studentShort = maskIdentifierForRole(shortUpi, 'student');
+  assert.strictEqual(studentShort.value, 'a*@okaxis');
+  assert.strictEqual(studentShort.normalizedValue, 'a*@okaxis');
+
+  const studentThree = maskIdentifierForRole(threeCharUpi, 'student');
+  assert.strictEqual(studentThree.value, 'p*y@upi');
+  assert.strictEqual(studentThree.normalizedValue, 'p*y@upi');
+
+  const studentMalformed = maskIdentifierForRole(malformedUpi, 'student');
+  assert.strictEqual(studentMalformed.value, '*****');
+  assert.strictEqual(studentMalformed.normalizedValue, '*****');
+
+  const studentMultiAt = maskIdentifierForRole(multiAtUpi, 'student');
+  assert.strictEqual(studentMultiAt.value, '*****');
+  assert.strictEqual(studentMultiAt.normalizedValue, '*****');
+
+  // Admin role: must receive raw unmasked values
+  const adminShort = maskIdentifierForRole(shortUpi, 'admin');
+  assert.strictEqual(adminShort.value, 'ab@okaxis');
+  assert.strictEqual(adminShort.normalizedValue, 'ab@okaxis');
+
+  const adminThree = maskIdentifierForRole(threeCharUpi, 'admin');
+  assert.strictEqual(adminThree.value, 'pay@upi');
+  assert.strictEqual(adminThree.normalizedValue, 'pay@upi');
+
+  const adminMalformed = maskIdentifierForRole(malformedUpi, 'admin');
+  assert.strictEqual(adminMalformed.value, 'malformedupi');
+  assert.strictEqual(adminMalformed.normalizedValue, 'malformedupi');
+
+  const adminMultiAt = maskIdentifierForRole(multiAtUpi, 'admin');
+  assert.strictEqual(adminMultiAt.value, 'foo@bar@baz');
+  assert.strictEqual(adminMultiAt.normalizedValue, 'foo@bar@baz');
+
+  // Original objects remain unmutated
+  assert.strictEqual(shortUpi.value, 'ab@okaxis');
+  assert.strictEqual(threeCharUpi.value, 'pay@upi');
+  assert.strictEqual(malformedUpi.value, 'malformedupi');
+  assert.strictEqual(multiAtUpi.value, 'foo@bar@baz');
 });
 
 console.log(`\nAll ${passedTests} / ${totalTests} Phase 4C pure unit tests passed successfully!\n`);
