@@ -6,10 +6,11 @@
  *
  * Mandatory invariants:
  * - All endpoints strictly enforce JWT authentication (auth) and admin role (requireAdmin).
- * - Only 3 endpoints are mounted:
- *   1. GET   /api/admin/reports      - List paginated reports (defaults to pending queue)
- *   2. GET   /api/admin/reports/:id  - Unmasked report inspection before moderation
- *   3. PATCH /api/admin/reports/:id  - Atomic moderation decision (verify, reject, investigate)
+ * - Endpoints:
+ *   1. GET   /api/admin/stats        - Aggregated platform analytics summary
+ *   2. GET   /api/admin/reports      - List paginated reports (defaults to pending queue)
+ *   3. GET   /api/admin/reports/:id  - Unmasked report inspection before moderation
+ *   4. PATCH /api/admin/reports/:id  - Atomic moderation decision (verify, reject, investigate)
  */
 
 const { Router } = require('express');
@@ -17,6 +18,7 @@ const auth = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const validate = require('../middleware/validate');
 const reportController = require('../controllers/report.controller');
+const adminController = require('../controllers/admin.controller');
 const {
   adminReportQuerySchema,
   reportIdParamSchema,
@@ -27,6 +29,9 @@ const router = Router();
 
 // Enforce auth and requireAdmin globally across all /api/admin routes
 router.use(auth, requireAdmin);
+
+// GET /api/admin/stats - Aggregated platform statistics
+router.get('/stats', adminController.getStats);
 
 // GET /api/admin/reports - Paginated report listing (defaults to pending queue)
 router.get(

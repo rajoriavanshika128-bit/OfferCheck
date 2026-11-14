@@ -25,6 +25,9 @@ router.post('/', validate(offerCheckSchema), checkController.checkOffer);
 // GET /api/checks - Authenticated user check history
 router.get('/', validate.query(offerCheckQuerySchema), checkController.getHistory);
 
+// GET /api/checks/dashboard - Authenticated user dashboard metrics
+router.get('/dashboard', checkController.getDashboardMetrics);
+
 // GET /api/checks/:id - Authenticated single check retrieval
 router.get('/:id', checkController.getCheckById);
 

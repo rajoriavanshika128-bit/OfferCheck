@@ -6,6 +6,7 @@ import { RiskBadge } from '../components/common/RiskBadge';
 import { MaskedValue } from '../components/common/MaskedValue';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { checkService } from '../services/checkService';
 
 const RECOMMENDED_ACTIONS = {
   critical: [
@@ -58,25 +59,57 @@ function ScoreRing({ score, category }) {
 export default function ResultsPage() {
   const { checkId } = useParams();
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(sessionStorage.getItem('offercheck_results') || '{}');
-      const r = stored[checkId];
-      if (r) setResult(r);
-      else setErr('Check not found.');
-    } catch {
-      setErr('Unable to load results.');
+    let mounted = true;
+    setLoading(true);
+    setErr('');
+
+    async function loadCheck() {
+      try {
+        const check = await checkService.getCheckById(checkId);
+        if (mounted) {
+          setResult(check);
+        }
+      } catch (error) {
+        if (mounted) {
+          setErr(error?.message || 'Check not found.');
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     }
+
+    if (checkId) {
+      loadCheck();
+    } else {
+      setErr('No check ID provided.');
+      setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
   }, [checkId]);
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
+      </PageLayout>
+    );
+  }
 
   if (err) return (
     <PageLayout>
       <div className="max-w-xl mx-auto py-20 text-center">
-        <AlertCircle size={48} className="text-[#6b6460] mx-auto mb-4" />
-        <h1 className="text-xl font-semibold text-[#f0ede8] mb-2">Results not found</h1>
-        <p className="text-sm text-[#a09890] mb-6">The check ID was not found in this session. Results are stored per-session only.</p>
+        <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
+        <h1 className="text-xl font-semibold text-[#f0ede8] mb-2">Check not found</h1>
+        <p className="text-sm text-[#a09890] mb-6">{err}</p>
         <Link to="/check" className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors">
           Run a new check
         </Link>
@@ -84,13 +117,17 @@ export default function ResultsPage() {
     </PageLayout>
   );
 
-  if (!result) return (
-    <PageLayout>
-      <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
-    </PageLayout>
-  );
+  if (!result) return null;
 
-  const { riskScore, riskCategory, riskFactors, summary, disclaimer, connectedReports, sharedIdentifiers, formData } = result;
+  const riskScore = result.riskScore ?? result.result?.score ?? 0;
+  const riskCategory = result.riskCategory || result.result?.riskCategory || 'low';
+  const riskFactors = result.result?.factors || result.riskFactors || [];
+  const summary = result.result?.summary || result.summary || 'Risk analysis complete.';
+  const disclaimer = result.result?.disclaimer || result.disclaimer || 'Risk scores are indicators based on pattern matching and historical community reports. They are not legal determinations. A low score does not guarantee legitimacy.';
+  const connectedReports = result.result?.connectedReports || result.connectedReports || [];
+  const sharedIdentifiers = result.result?.matchedIdentifiers || result.sharedIdentifiers || [];
+  const companyName = result.companyName || result.formData?.companyName || 'Offer';
+
   const ScoreIcon = riskCategory === 'critical' ? ShieldAlert : riskCategory === 'high' ? ShieldAlert : riskCategory === 'medium' ? Shield : ShieldCheck;
   const scoreIconColor = { critical:'text-red-400', high:'text-orange-400', medium:'text-yellow-400', low:'text-green-400' };
 
@@ -103,7 +140,7 @@ export default function ResultsPage() {
             <ScoreIcon size={28} className={scoreIconColor[riskCategory]} />
           </div>
           <h1 className="text-lg font-semibold text-[#f0ede8] mb-6">
-            {formData.companyName || 'Offer'} — Risk Assessment
+            {companyName} — Risk Assessment
           </h1>
           <ScoreRing score={riskScore} category={riskCategory} />
           <div className="mt-4">
@@ -135,9 +172,11 @@ export default function ResultsPage() {
                     <div className="bg-amber-500 h-1.5 rounded-full transition-all" style={{ width: `${Math.min((f.weight / 35) * 100, 100)}%` }} />
                   </div>
                   <p className="text-xs text-[#a09890] mb-2 leading-relaxed">{f.explanation}</p>
-                  <div className="bg-[#0f0f0f] border border-[#1c1c1c] rounded px-3 py-2 text-xs text-[#6b6460] font-mono break-all">
-                    {f.evidence}
-                  </div>
+                  {(f.evidence || f.provenance) && (
+                    <div className="bg-[#0f0f0f] border border-[#1c1c1c] rounded px-3 py-2 text-xs text-[#6b6460] font-mono break-all">
+                      {f.evidence || f.provenance}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

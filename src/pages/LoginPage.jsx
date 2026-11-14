@@ -42,7 +42,7 @@ export default function LoginPage() {
 
         {/* Demo credentials box */}
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-          <p className="text-xs font-semibold text-amber-400 mb-2">Illustrative demo credentials — not real accounts</p>
+          <p className="text-xs font-semibold text-amber-400 mb-2">Seed demo credentials</p>
           <div className="space-y-1 text-xs text-[#a09890] font-mono">
             <div>Student: <span className="text-[#f0ede8]">student@demo.offercheck</span> / <span className="text-[#f0ede8]">student123</span></div>
             <div>Admin: <span className="text-[#f0ede8]">admin@demo.offercheck</span> / <span className="text-[#f0ede8]">admin123</span></div>

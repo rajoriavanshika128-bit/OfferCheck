@@ -4,7 +4,7 @@ import { FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Button } from '../components/common/Button';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
-import { submitReport } from '../services/mockApi';
+import { reportService } from '../services/reportService';
 
 // Label + input wrapper — defined at module scope to maintain stable identity
 function Field({ label, hint, error, children }) {
@@ -62,26 +62,21 @@ export default function SubmitReportPage() {
     setErrors({});
     setLoading(true);
     try {
-      const result = await submitReport({
+      const result = await reportService.submitReport({
         companyName: form.companyName.trim(),
-        domain: form.domain.trim() || null,
-        recruiterName: form.recruiterName.trim() || null,
-        phone: form.phone.trim() || null,
-        email: form.email.trim() || null,
-        upiId: form.upiId.trim() || null,
-        paymentRequest: form.paymentRequest.trim() || null,
+        domain: form.domain.trim() || undefined,
+        recruiterName: form.recruiterName.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        email: form.email.trim() || undefined,
+        upiId: form.upiId.trim() || undefined,
+        paymentRequest: form.paymentRequest.trim() || undefined,
         offerMessage: form.offerMessage.trim(),
-        additionalNotes: form.additionalNotes.trim() || null,
-        // riskScore, riskCategory, title, etc. will be computed by the backend.
-        // For now, set illustrative defaults for the demo session.
-        title: `Report — ${form.companyName.trim()}`,
-        riskScore: 50,
-        riskCategory: 'medium',
+        additionalNotes: form.additionalNotes.trim() || undefined,
       });
       setSubmittedId(result.id);
       setSubmitted(true);
-    } catch {
-      setErrors({ general: 'An error occurred. Please try again.' });
+    } catch (err) {
+      setErrors({ general: err.message || 'An error occurred. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -99,7 +94,7 @@ export default function SubmitReportPage() {
             Your report <span className="text-[#f0ede8] font-mono">{submittedId}</span> has been recorded and is pending moderator review.
           </p>
           <p className="text-xs text-[#6b6460] mb-8">
-            This is a demo — no data is persisted beyond this session. In a live system, our moderation team would review your report within 48 hours.
+            Your report has been saved and queued for moderator verification. Once verified, it will be visible in public search and contribute to student fraud warnings.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button variant="primary" onClick={() => navigate('/reports')}>

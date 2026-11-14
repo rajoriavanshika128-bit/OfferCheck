@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, AlertCircle, Info } from 'lucide-react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Button } from '../components/common/Button';
-import { checkOffer } from '../services/mockApi';
-import { useAuth } from '../contexts/AuthContext';
+import { checkService } from '../services/checkService';
 
 function Section({ title, children }) {
   return (
@@ -31,7 +30,6 @@ const inputClass = (err) =>
   ${err ? 'border-red-500/60' : 'border-[#3a3a3a] focus:border-amber-500/60'}`;
 
 export default function OfferCheckerPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     companyName: '', domain: '',
@@ -46,8 +44,11 @@ export default function OfferCheckerPage() {
 
   const validate = () => {
     const e = {};
-    if (!form.companyName.trim() && !form.phone.trim() && !form.email.trim()) {
-      e.general = 'Please provide at least a company name, recruiter phone, or email address.';
+    if (!form.offerMessage?.trim()) {
+      e.offerMessage = 'Offer message or description is required for risk analysis.';
+    }
+    if (!form.companyName.trim() && !form.phone.trim() && !form.email.trim() && !form.domain.trim() && !form.upiId.trim()) {
+      e.general = 'Please provide at least a company name, recruiter phone, email, website, or UPI ID.';
     }
     return e;
   };
@@ -59,10 +60,10 @@ export default function OfferCheckerPage() {
     setErrors({});
     setLoading(true);
     try {
-      const result = await checkOffer(form, user?.role || 'student');
-      navigate(`/results/${result.checkId}`);
-    } catch {
-      setErrors({ general: 'An error occurred. Please try again.' });
+      const check = await checkService.checkOffer(form);
+      navigate(`/results/${check.id || check.checkId}`);
+    } catch (err) {
+      setErrors({ general: err.message || 'An error occurred. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -116,10 +117,10 @@ export default function OfferCheckerPage() {
               <Field label="Payment Request" hint="Describe any fee or deposit requested.">
                 <input value={form.paymentRequest} onChange={set('paymentRequest')} placeholder="e.g. ₹2,500 registration fee" className={inputClass()} />
               </Field>
-              <Field label="Offer Message">
+              <Field label="Offer Message" error={errors.offerMessage} hint="Required: paste the job or internship message, email, or offer text.">
                 <textarea value={form.offerMessage} onChange={set('offerMessage')} rows={4}
                   placeholder="Paste the offer message or description here…"
-                  className={`${inputClass()} resize-none`} />
+                  className={`${inputClass(errors.offerMessage)} resize-none`} />
               </Field>
             </div>
           </Section>

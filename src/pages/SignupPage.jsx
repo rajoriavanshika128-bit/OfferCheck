@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
-import { DisclaimerBox } from '../components/common/DisclaimerBox';
 
 // Defined at module scope so React sees a stable component identity across renders.
 // Defining this inside SignupPage would cause it to remount on every keystroke,
@@ -24,7 +23,7 @@ function Field({ id, label, type = 'text', value, onChange, error, placeholder, 
 export default function SignupPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ name: '', email: '', college: '', password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -34,7 +33,7 @@ export default function SignupPage() {
     if (!form.name.trim()) e.name = 'Name is required.';
     if (!form.email.trim()) e.email = 'Email is required.';
     if (!form.password) e.password = 'Password is required.';
-    else if (form.password.length < 6) e.password = 'Password must be at least 6 characters.';
+    else if (form.password.length < 8) e.password = 'Password must be at least 8 characters.';
     if (form.password !== form.confirm) e.confirm = 'Passwords do not match.';
     return e;
   };
@@ -46,7 +45,7 @@ export default function SignupPage() {
     setErrors({});
     setLoading(true);
     try {
-      await signup(form.name.trim(), form.email.trim(), form.password);
+      await signup(form.name.trim(), form.email.trim(), form.password, form.college.trim());
       navigate('/dashboard');
     } catch (err) {
       setErrors({ general: err.message });
@@ -68,8 +67,6 @@ export default function SignupPage() {
           <p className="text-sm text-[#a09890] mt-1">Join OfferCheck to verify offers</p>
         </div>
 
-        <DisclaimerBox compact text="This is a demo — no real account is created. All data is illustrative only." />
-
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {errors.general && (
             <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
@@ -79,12 +76,13 @@ export default function SignupPage() {
 
           <Field id="name" label="Full name" value={form.name} onChange={set('name')} placeholder="Priya Desai" error={errors.name} />
           <Field id="email" label="Email address" type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" error={errors.email} autoComplete="email" />
+          <Field id="college" label="College / University (optional)" value={form.college} onChange={set('college')} placeholder="e.g. Delhi Technological University" error={errors.college} />
 
           <div>
             <label className="block text-xs font-medium text-[#a09890] mb-1.5">Password</label>
             <div className="relative">
               <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')}
-                placeholder="Min. 6 characters"
+                placeholder="Min. 8 characters"
                 className={`w-full bg-[#161616] border rounded-lg px-3 py-2.5 pr-10 text-sm text-[#f0ede8] placeholder-[#6b6460] focus:outline-none transition-colors
                   ${errors.password ? 'border-red-500/60' : 'border-[#3a3a3a] focus:border-amber-500/60'}`} />
               <button type="button" onClick={() => setShowPw(s => !s)}

@@ -104,8 +104,30 @@ async function getCheckById(req, res, next) {
   }
 }
 
+/**
+ * GET /api/checks/dashboard
+ * Retrieve aggregated dashboard metrics for the authenticated user.
+ */
+async function getDashboardMetrics(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const metrics = await checkService.getDashboardMetrics(req.user.id, req.user.role);
+
+    return res.status(200).json({
+      success: true,
+      metrics,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   checkOffer,
   getHistory,
   getCheckById,
+  getDashboardMetrics,
 };

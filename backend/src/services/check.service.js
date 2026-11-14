@@ -376,10 +376,116 @@ async function getCheckById(checkId, currentUser) {
   return sanitizeCheckForRole(check, currentUser.role);
 }
 
+/**
+ * Retrieve aggregated dashboard metrics for an authenticated user.
+ * Executes genuine database counts, averages, and 7-day UTC activity.
+ *
+ * @param {string} userId - Authenticated user UUID
+ * @param {string} [role='student'] - Authenticated user role
+ * @returns {Promise<object>} Aggregated dashboard metrics object
+ */
+async function getDashboardMetrics(userId, role = 'student') {
+  if (!userId || typeof userId !== 'string') {
+    throw new AppError('User ID is required', 400);
+  }
+
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startDateUtc = new Date(todayUtc);
+  startDateUtc.setUTCDate(todayUtc.getUTCDate() - 6);
+
+  const [
+    totalChecks,
+    reportsSubmitted,
+    savedReports,
+    highRiskChecks,
+    avgResult,
+    weeklyChecks,
+    recent,
+  ] = await Promise.all([
+    prisma.offerCheck.count({ where: { userId } }),
+    prisma.report.count({ where: { submittedBy: userId } }),
+    prisma.savedReport.count({ where: { userId } }),
+    prisma.offerCheck.count({
+      where: {
+        userId,
+        riskCategory: { in: ['critical', 'high'] },
+      },
+    }),
+    prisma.offerCheck.aggregate({
+      where: { userId, riskScore: { not: null } },
+      _avg: { riskScore: true },
+    }),
+    prisma.offerCheck.findMany({
+      where: {
+        userId,
+        checkedAt: { gte: startDateUtc },
+      },
+      select: { checkedAt: true },
+    }),
+    prisma.offerCheck.findMany({
+      where: { userId },
+      orderBy: { checkedAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        userId: true,
+        companyName: true,
+        phoneQuery: true,
+        emailQuery: true,
+        upiQuery: true,
+        domainQuery: true,
+        riskScore: true,
+        riskCategory: true,
+        checkedAt: true,
+        result: true,
+      },
+    }),
+  ]);
+
+  // Construct continuous 7-day UTC activity array
+  const countsByDate = {};
+  for (const c of weeklyChecks) {
+    if (c.checkedAt) {
+      const dStr = c.checkedAt.toISOString().slice(0, 10);
+      countsByDate[dStr] = (countsByDate[dStr] || 0) + 1;
+    }
+  }
+
+  const weeklyActivity = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDateUtc);
+    d.setUTCDate(startDateUtc.getUTCDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const day = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+    weeklyActivity.push({
+      date: dateStr,
+      day,
+      checks: countsByDate[dateStr] || 0,
+    });
+  }
+
+  const sanitizedRecentChecks = recent.map((item) => sanitizeCheckForRole(item, role));
+  const avgRiskScore = avgResult._avg?.riskScore !== null && avgResult._avg?.riskScore !== undefined
+    ? Math.round(avgResult._avg.riskScore)
+    : null;
+
+  return {
+    totalChecks,
+    reportsSubmitted,
+    savedReports,
+    highRiskChecks,
+    avgRiskScore,
+    weeklyActivity,
+    recentChecks: sanitizedRecentChecks,
+  };
+}
+
 module.exports = {
   hashClientIp,
   sanitizeCheckForRole,
   performCheck,
   getCheckHistory,
   getCheckById,
+  getDashboardMetrics,
 };
