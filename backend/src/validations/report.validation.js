@@ -356,11 +356,13 @@ const publicReportQuerySchema = z
   })
   .strict();
 
+const ADMIN_REPORT_STATUSES = Object.freeze([...REPORT_STATUSES, 'all']);
+
 /**
  * Administrative report moderation query schema (GET /api/admin/reports).
  *
  * Requirements:
- * - Allows searching across all report statuses ('pending', 'verified', 'rejected', 'investigating').
+ * - Allows searching across all report statuses ('pending', 'verified', 'rejected', 'investigating', 'all').
  * - Requires admin authentication and authorization in the route handler.
  */
 const adminReportQuerySchema = z
@@ -368,7 +370,7 @@ const adminReportQuerySchema = z
     page: pageQuerySchema,
     limit: limitQuerySchema,
     status: z
-      .enum(REPORT_STATUSES, {
+      .enum(ADMIN_REPORT_STATUSES, {
         message: 'Invalid report status filter',
       })
       .optional(),

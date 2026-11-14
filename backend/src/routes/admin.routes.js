@@ -24,6 +24,10 @@ const {
   reportIdParamSchema,
   moderateReportSchema,
 } = require('../validations/report.validation');
+const {
+  adminIdentifierQuerySchema,
+  adminAuditQuerySchema,
+} = require('../validations/admin.validation');
 
 const router = Router();
 
@@ -53,6 +57,26 @@ router.patch(
   validate.params(reportIdParamSchema),
   validate(moderateReportSchema),
   reportController.moderateReport
+);
+
+// GET /api/admin/identifiers - Paginated identifiers with type and flagged filters
+router.get(
+  '/identifiers',
+  validate.query(adminIdentifierQuerySchema),
+  adminController.getIdentifiers
+);
+
+// GET /api/admin/clusters - Discovered fraud clusters with report relationships
+router.get(
+  '/clusters',
+  adminController.getClusters
+);
+
+// GET /api/admin/audit-logs - Immutable administrative audit logs
+router.get(
+  '/audit-logs',
+  validate.query(adminAuditQuerySchema),
+  adminController.getAuditLogs
 );
 
 module.exports = router;
