@@ -15,6 +15,7 @@ const authRouter = require('./routes/auth.routes');
 const reportRouter = require('./routes/report.routes');
 const checkRouter = require('./routes/check.routes');
 const adminRouter = require('./routes/admin.routes');
+const graphRouter = require('./routes/graph.routes');
 const { errorHandler } = require('./utils/errors');
 const { resolveCorsOrigin } = require('./utils/cors');
 
@@ -54,6 +55,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/reports', reportRouter);
 app.use('/api/checks', checkRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/graph', graphRouter);
 
 // 404 handler for unmatched routes
 app.use((_req, res) => {

@@ -90,9 +90,20 @@ const checkLimiter = createLimiter({
   message: 'Too many offer checks submitted. Please try again after 15 minutes.',
 });
 
+/**
+ * 4. Public Trust Graph & Stats Limiter:
+ * Maximum 60 requests per 15 minutes per IP address.
+ */
+const graphLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 60,
+  message: 'Too many graph queries requested from this IP. Please try again after 15 minutes.',
+});
+
 module.exports = {
   createLimiter,
   loginLimiter,
   signupLimiter,
   checkLimiter,
+  graphLimiter,
 };

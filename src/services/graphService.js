@@ -1,3 +1,13 @@
+/**
+ * src/services/graphService.js
+ * Domain service for verified Trust Graph exploration and public platform metrics.
+ * Connects to real backend endpoints:
+ * - GET /api/graph       (Trust graph & subgraph BFS queries)
+ * - GET /api/graph/stats (Public platform statistics)
+ */
+
+import api from './api.js';
+
 export const NODE_TYPES = {
   REPORT: 'report',
   PHONE: 'phone',
@@ -22,193 +32,233 @@ export const EDGE_STYLES = {
   low: { strokeDasharray: '3 3', label: 'Low confidence' },
 };
 
-// Builds graph from REAL identifier/report relationships only
-// Only includes identifiers that appear in 2+ reports (meaningful connections)
-export const buildGraphData = (reports, identifiers, filters = {}) => {
-  const nodes = [];
-  const edges = [];
-  const nodeSet = new Set();
+/**
+ * Retrieve verified trust graph or connected subgraph from the backend.
+ * Calls GET /api/graph.
+ *
+ * @param {object} [params={}] - Query parameters { start, depth, flaggedOnly, limit }
+ * @returns {Promise<{ nodes: Array<object>, edges: Array<object>, truncated: boolean, startNodeId?: string }>}
+ */
+export async function getTrustGraph(params = {}) {
+  const query = new URLSearchParams();
 
-  let sharedIdentifiers = identifiers.filter(id => id.reportIds.length >= 2);
-  if (filters.flaggedOnly) {
-    sharedIdentifiers = sharedIdentifiers.filter(id => id.flagged);
+  if (params.start && typeof params.start === 'string' && params.start.trim()) {
+    query.set('start', params.start.trim());
   }
 
-  sharedIdentifiers.forEach(identifier => {
-    if (!nodeSet.has(identifier.id)) {
-      nodes.push({
-        id: identifier.id,
-        type: identifier.type,
-        label: identifier.value.length > 25 ? identifier.value.substring(0, 22) + '...' : identifier.value,
-        fullLabel: identifier.value,
-        riskScore: identifier.riskScore,
-        flagged: identifier.flagged,
-        reportCount: identifier.reportIds.length,
-        confidence: identifier.confidence || 'medium',
-        data: identifier,
-      });
-      nodeSet.add(identifier.id);
-    }
-
-    identifier.reportIds.forEach(reportId => {
-      const report = reports.find(r => r.id === reportId);
-      if (!report) return;
-
-      if (!nodeSet.has(reportId)) {
-        nodes.push({
-          id: reportId,
-          type: 'report',
-          label: report.companyName.length > 20
-            ? report.companyName.substring(0, 17) + '...'
-            : report.companyName,
-          fullLabel: report.title,
-          riskScore: report.riskScore,
-          riskCategory: report.riskCategory,
-          status: report.status,
-          data: report,
-        });
-        nodeSet.add(reportId);
-      }
-
-      const edgeId = `${identifier.id}-${reportId}`;
-      if (!edges.find(e => e.id === edgeId)) {
-        edges.push({
-          id: edgeId,
-          source: identifier.id,
-          target: reportId,
-          type: identifier.type,
-          label: `shares ${identifier.type}`,
-          confidence: identifier.confidence || 'medium',
-          connectionBasis: `Report ${reportId} shares ${identifier.type} "${identifier.value}" with ${identifier.reportIds.filter(r => r !== reportId).join(', ')}`,
-        });
-      }
-    });
-  });
-
-  return { nodes, edges };
-};
-
-// BFS traversal up to `depth` hops from a starting node
-export const getConnectedSubgraph = (nodeId, reports, identifiers, depth = 2) => {
-  const visitedNodes = new Set();
-  const visitedEdges = new Set();
-  const resultNodes = [];
-  const resultEdges = [];
-
-  const traverse = (currentId, currentDepth) => {
-    if (currentDepth > depth || visitedNodes.has(currentId)) return;
-    visitedNodes.add(currentId);
-
-    const report = reports.find(r => r.id === currentId);
-    const identifier = identifiers.find(id => id.id === currentId);
-
-    if (report) {
-      resultNodes.push({
-        id: currentId, type: 'report',
-        label: report.companyName, fullLabel: report.title,
-        riskScore: report.riskScore, riskCategory: report.riskCategory,
-        status: report.status, data: report,
-      });
-      report.identifierIds.forEach(idId => {
-        const edgeId = `${idId}-${currentId}`;
-        if (!visitedEdges.has(edgeId)) {
-          visitedEdges.add(edgeId);
-          const ident = identifiers.find(i => i.id === idId);
-          if (ident) {
-            resultEdges.push({
-              id: edgeId, source: idId, target: currentId,
-              type: ident.type, confidence: ident.confidence || 'medium',
-              label: `shares ${ident.type}`,
-            });
-            traverse(idId, currentDepth + 1);
-          }
-        }
-      });
-    } else if (identifier) {
-      resultNodes.push({
-        id: currentId, type: identifier.type,
-        label: identifier.value.length > 25 ? identifier.value.substring(0, 22) + '...' : identifier.value,
-        fullLabel: identifier.value,
-        riskScore: identifier.riskScore, flagged: identifier.flagged,
-        reportCount: identifier.reportIds.length, confidence: identifier.confidence || 'medium',
-        data: identifier,
-      });
-      identifier.reportIds.forEach(rId => {
-        const edgeId = `${currentId}-${rId}`;
-        if (!visitedEdges.has(edgeId)) {
-          visitedEdges.add(edgeId);
-          resultEdges.push({
-            id: edgeId, source: currentId, target: rId,
-            type: identifier.type, confidence: identifier.confidence || 'medium',
-            label: `shares ${identifier.type}`,
-          });
-          traverse(rId, currentDepth + 1);
-        }
-      });
-    }
-  };
-
-  traverse(nodeId, 0);
-  return { nodes: resultNodes, edges: resultEdges, startNodeId: nodeId };
-};
-
-// Plain-language explanation of why two reports are connected
-export const explainConnection = (reportIdA, reportIdB, reports, identifiers) => {
-  const reportA = reports.find(r => r.id === reportIdA);
-  const reportB = reports.find(r => r.id === reportIdB);
-  if (!reportA || !reportB) return null;
-
-  const idsA = new Set(reportA.identifierIds);
-  const sharedIdentifiers = identifiers.filter(id => idsA.has(id.id) && id.reportIds.includes(reportIdB));
-
-  if (sharedIdentifiers.length === 0) {
-    // Check 2-hop: identifiers of A that share any report with any identifier of B
-    const idsB = new Set(reportB.identifierIds);
-    const indirectLinks = [];
-    identifiers.filter(id => idsA.has(id.id)).forEach(idA => {
-      identifiers.filter(id => idsB.has(id.id)).forEach(idB => {
-        const sharedReports = idA.reportIds.filter(r => idB.reportIds.includes(r) && r !== reportIdA && r !== reportIdB);
-        if (sharedReports.length > 0) {
-          indirectLinks.push({ identifierA: idA, identifierB: idB, throughReports: sharedReports });
-        }
-      });
-    });
-    if (indirectLinks.length > 0) {
-      return {
-        type: 'indirect',
-        sharedIdentifiers: [],
-        indirectLinks,
-        confidence: 'low',
-        explanation: `These two reports are not directly linked but share a 2-hop connection: ${indirectLinks.map(l => `${reportIdA}'s ${l.identifierA.type} and ${reportIdB}'s ${l.identifierB.type} both appear in report(s) ${l.throughReports.join(', ')}`).join('; ')}.`,
-        hops: 2,
-      };
-    }
-    return { type: 'none', sharedIdentifiers: [], confidence: 'none', explanation: 'No direct or indirect connection found between these two reports in the current dataset.', hops: null };
+  if (params.depth !== undefined && params.depth !== null && params.depth !== '') {
+    query.set('depth', String(params.depth));
   }
 
-  const highestConfidence = sharedIdentifiers.some(id => id.confidence === 'high') ? 'high' : sharedIdentifiers.some(id => id.confidence === 'medium') ? 'medium' : 'low';
-  const descriptions = sharedIdentifiers.map(id => `${id.type} "${id.value}"`).join(', ');
+  if (params.flaggedOnly) {
+    query.set('flaggedOnly', 'true');
+  }
+
+  if (params.limit !== undefined && params.limit !== null && params.limit !== '') {
+    query.set('limit', String(params.limit));
+  }
+
+  const queryString = query.toString();
+  const endpoint = `/api/graph${queryString ? `?${queryString}` : ''}`;
+  const res = await api.get(endpoint);
 
   return {
-    type: 'direct',
-    sharedIdentifiers,
-    confidence: highestConfidence,
-    explanation: `Reports ${reportIdA} (${reportA.companyName}) and ${reportIdB} (${reportB.companyName}) are directly linked by shared ${descriptions}. This means the same ${sharedIdentifiers[0].type} was used in both cases, suggesting a common fraud actor or infrastructure.`,
-    hops: 1,
+    nodes: Array.isArray(res.nodes) ? res.nodes : [],
+    edges: Array.isArray(res.edges) ? res.edges : [],
+    truncated: Boolean(res.truncated),
+    ...(res.startNodeId ? { startNodeId: res.startNodeId } : {}),
   };
-};
+}
 
-// Calculate positions for SVG graph layout
-export const calculateNodePositions = (nodes, canvasWidth = 900, canvasHeight = 600) => {
+/**
+ * Retrieve connected subgraph starting from a specific node ID up to N hops.
+ * Calls GET /api/graph?start={nodeId}&depth={depth}.
+ *
+ * @param {string} nodeId - Report or identifier ID
+ * @param {number} [depth=2] - Traversal depth (1..3)
+ * @returns {Promise<{ nodes: Array<object>, edges: Array<object>, truncated: boolean, startNodeId: string }>}
+ */
+export async function getSubgraph(nodeId, depth = 2) {
+  return getTrustGraph({ start: nodeId, depth });
+}
+
+/**
+ * Retrieve genuine platform statistics based on verified reports.
+ * Calls GET /api/graph/stats.
+ *
+ * @returns {Promise<{ verifiedReports: number, totalIdentifiers: number, activeClusters: number, sharedIdentifiers: number }>}
+ */
+export async function getPublicStats() {
+  const res = await api.get('/api/graph/stats');
+  return res.stats;
+}
+
+export const STAT_ITEMS = [
+  { key: 'verifiedReports', label: 'Reports in database' },
+  { key: 'totalIdentifiers', label: 'Identifiers tracked' },
+  { key: 'activeClusters', label: 'Fraud clusters' },
+  { key: 'sharedIdentifiers', label: 'Shared identifiers' },
+];
+
+/**
+ * Format public statistics count for landing page presentation.
+ * Returns exact database counts or clean placeholder '—' without layout shift.
+ *
+ * @param {object|null} stats
+ * @param {string} key
+ * @param {boolean} loading
+ * @param {boolean} error
+ * @returns {string}
+ */
+export function formatStatValue(stats, key, loading, error) {
+  if (loading || error || !stats) return '—';
+  const val = stats[key];
+  if (typeof val !== 'number') return '—';
+  return String(val);
+}
+
+/**
+ * Client-side plain-language explanation of why two report nodes are connected
+ * based on the genuinely loaded graph data (nodes & edges).
+ *
+ * @param {string} reportIdA
+ * @param {string} reportIdB
+ * @param {Array<object>} [nodes=[]]
+ * @param {Array<object>} [edges=[]]
+ * @returns {object} { type: 'direct'|'indirect'|'none', sharedIdentifiers: Array, confidence: string, explanation: string, hops: number|null }
+ */
+export function explainReportConnection(reportIdA, reportIdB, nodes = [], edges = []) {
+  if (!reportIdA || !reportIdB) return null;
+
+  const reportNodeA = nodes.find((n) => n.id === reportIdA);
+  const reportNodeB = nodes.find((n) => n.id === reportIdB);
+
+  const companyA = reportNodeA?.data?.companyName || reportNodeA?.label || reportIdA;
+  const companyB = reportNodeB?.data?.companyName || reportNodeB?.label || reportIdB;
+
+  // 1. Identify direct shared identifiers: identifiers connected to both reportIdA and reportIdB
+  const edgesToA = edges.filter((e) => e.target === reportIdA || e.source === reportIdA);
+  const identIdsA = new Set(edgesToA.map((e) => (e.target === reportIdA ? e.source : e.target)));
+
+  const edgesToB = edges.filter((e) => e.target === reportIdB || e.source === reportIdB);
+  const identIdsB = new Set(edgesToB.map((e) => (e.target === reportIdB ? e.source : e.target)));
+
+  const sharedIdentIds = Array.from(identIdsA).filter((id) => identIdsB.has(id));
+
+  if (sharedIdentIds.length > 0) {
+    const sharedIdents = sharedIdentIds
+      .map((id) => nodes.find((n) => n.id === id))
+      .filter(Boolean);
+
+    const relatedEdges = edges.filter(
+      (e) =>
+        (e.target === reportIdA || e.target === reportIdB) &&
+        sharedIdentIds.includes(e.source)
+    );
+    const hasHighConfidence = relatedEdges.some((e) => e.confidence === 'high');
+    const confidence = hasHighConfidence ? 'high' : 'medium';
+
+    const descriptions = sharedIdents
+      .map((id) => `${id.type.replace('_', ' ')} "${id.data?.value || id.label}"`)
+      .join(', ');
+
+    const primaryType = sharedIdents[0]?.type?.replace('_', ' ') || 'indicator';
+
+    return {
+      type: 'direct',
+      sharedIdentifiers: sharedIdents,
+      confidence,
+      explanation: `Reports ${reportIdA} (${companyA}) and ${reportIdB} (${companyB}) are directly linked by shared ${descriptions}. This means the same ${primaryType} was used in both incidents, suggesting a common fraud actor or infrastructure.`,
+      hops: 1,
+    };
+  }
+
+  // 2. Check 2-hop indirect connection: reportA -> identA -> intermediateReport -> identB -> reportB
+  const intermediateReportMap = new Map();
+
+  for (const idA of identIdsA) {
+    const otherEdges = edges.filter(
+      (e) =>
+        (e.source === idA || e.target === idA) &&
+        e.target !== reportIdA &&
+        e.source !== reportIdA
+    );
+    for (const oe of otherEdges) {
+      const intermediateReportId = oe.target === idA ? e.source : oe.target;
+      if (intermediateReportId && intermediateReportId !== reportIdA && intermediateReportId !== reportIdB) {
+        if (!intermediateReportMap.has(intermediateReportId)) {
+          intermediateReportMap.set(intermediateReportId, { idA, idB: null });
+        }
+      }
+    }
+  }
+
+  for (const idB of identIdsB) {
+    const otherEdges = edges.filter(
+      (e) =>
+        (e.source === idB || e.target === idB) &&
+        e.target !== reportIdB &&
+        e.source !== reportIdB
+    );
+    for (const oe of otherEdges) {
+      const intermediateReportId = oe.target === idB ? e.source : oe.target;
+      if (intermediateReportMap.has(intermediateReportId)) {
+        intermediateReportMap.get(intermediateReportId).idB = idB;
+      }
+    }
+  }
+
+  const indirectMatches = Array.from(intermediateReportMap.entries()).filter(
+    ([, match]) => match.idB !== null
+  );
+
+  if (indirectMatches.length > 0) {
+    const intermediateNames = indirectMatches.map(([rId]) => {
+      const rNode = nodes.find((n) => n.id === rId);
+      return rNode?.data?.companyName || rNode?.label || rId;
+    });
+
+    return {
+      type: 'indirect',
+      sharedIdentifiers: [],
+      confidence: 'low',
+      explanation: `These two reports are not directly linked but share a 2-hop connection through intermediate report(s): ${intermediateNames.join(', ')}.`,
+      hops: 2,
+    };
+  }
+
+  return {
+    type: 'none',
+    sharedIdentifiers: [],
+    confidence: 'none',
+    explanation: 'No direct or indirect connection found between these two reports in the current graph.',
+    hops: null,
+  };
+}
+
+/**
+ * Backward compatibility alias for explainConnection.
+ */
+export function explainConnection(reportIdA, reportIdB, reportsOrNodes, identifiersOrEdges) {
+  if (Array.isArray(identifiersOrEdges) && identifiersOrEdges[0] && 'source' in identifiersOrEdges[0]) {
+    return explainReportConnection(reportIdA, reportIdB, reportsOrNodes, identifiersOrEdges);
+  }
+  // Legacy fallback if called with raw mock arrays
+  return explainReportConnection(reportIdA, reportIdB, [], []);
+}
+
+/**
+ * Calculate positions for SVG graph layout.
+ */
+export const calculateNodePositions = (nodes = [], canvasWidth = 900, canvasHeight = 600) => {
   const positions = {};
   const typeGroups = { upi: [], phone: [], email: [], domain: [], bank_account: [], report: [] };
 
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const group = typeGroups[node.type] || typeGroups.report;
     group.push(node);
   });
 
-  // Identifier types placed in a band; reports around them
   const typePositions = {
     upi:          { cx: canvasWidth * 0.25, cy: canvasHeight * 0.25 },
     phone:        { cx: canvasWidth * 0.75, cy: canvasHeight * 0.25 },
@@ -217,16 +267,14 @@ export const calculateNodePositions = (nodes, canvasWidth = 900, canvasHeight = 
     bank_account: { cx: canvasWidth * 0.5,  cy: canvasHeight * 0.15 },
   };
 
-  // Place identifier nodes — radius scales with group size to prevent overlap
   Object.entries(typeGroups).forEach(([type, group]) => {
     if (type === 'report') return;
     const center = typePositions[type] || { cx: canvasWidth * 0.5, cy: canvasHeight * 0.5 };
-    // Minimum 44px arc-length per node at the chosen radius avoids label collisions.
-    // For 1 node: radius 0 (placed at center). For 2+: at least 44px per node around circumference.
     const minArcLength = 44;
-    const radius = group.length > 1
-      ? Math.max(60, (group.length * minArcLength) / (2 * Math.PI))
-      : 0;
+    const radius =
+      group.length > 1
+        ? Math.max(60, (group.length * minArcLength) / (2 * Math.PI))
+        : 0;
     group.forEach((node, i) => {
       const angle = (2 * Math.PI * i) / Math.max(group.length, 1);
       positions[node.id] = {
@@ -236,11 +284,11 @@ export const calculateNodePositions = (nodes, canvasWidth = 900, canvasHeight = 
     });
   });
 
-  // Place report nodes around the center
   const reportNodes = typeGroups.report;
   const reportCx = canvasWidth * 0.5;
   const reportCy = canvasHeight * 0.5;
   const reportRadius = Math.min(canvasWidth, canvasHeight) * 0.35;
+
   reportNodes.forEach((node, i) => {
     const angle = (2 * Math.PI * i) / Math.max(reportNodes.length, 1) - Math.PI / 2;
     positions[node.id] = {
@@ -252,3 +300,21 @@ export const calculateNodePositions = (nodes, canvasWidth = 900, canvasHeight = 
   return positions;
 };
 
+// Legacy mock builders kept for mockApi backward-compatibility
+export const buildGraphData = () => ({ nodes: [], edges: [] });
+export const getConnectedSubgraph = () => ({ nodes: [], edges: [], startNodeId: null });
+
+export const graphService = {
+  getTrustGraph,
+  getSubgraph,
+  getPublicStats,
+  explainReportConnection,
+  calculateNodePositions,
+  formatStatValue,
+  STAT_ITEMS,
+  NODE_TYPES,
+  NODE_COLORS,
+  EDGE_STYLES,
+};
+
+export default graphService;

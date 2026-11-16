@@ -10,6 +10,7 @@ const identifierValidations = require('./identifier.validation');
 const reportValidations = require('./report.validation');
 const checkValidations = require('./check.validation');
 const adminValidations = require('./admin.validation');
+const graphValidations = require('./graph.validation');
 
 module.exports = {
   ...authValidations,
@@ -17,4 +18,5 @@ module.exports = {
   ...reportValidations,
   ...checkValidations,
   ...adminValidations,
+  ...graphValidations,
 };

@@ -6,8 +6,14 @@ import { RiskBadge } from '../components/common/RiskBadge';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { MaskedValue } from '../components/common/MaskedValue';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
-import { getTrustGraph, getSubgraph, explainReportConnection } from '../services/mockApi';
-import { calculateNodePositions, NODE_COLORS, EDGE_STYLES } from '../services/graphService';
+import {
+  getTrustGraph,
+  getSubgraph,
+  explainReportConnection,
+  calculateNodePositions,
+  NODE_COLORS,
+  EDGE_STYLES,
+} from '../services/graphService';
 import { useAuth } from '../contexts/AuthContext';
 
 const CANVAS_W = 960;
@@ -245,12 +251,17 @@ export default function TrustGraphPage() {
     if (!selectedNode || !secondNode || selectedNode.type !== 'report' || secondNode.type !== 'report') return;
     setExplainLoading(true);
     try {
-      const result = await explainReportConnection(selectedNode.id, secondNode.id);
+      const result = await explainReportConnection(
+        selectedNode.id,
+        secondNode.id,
+        graphData?.nodes || [],
+        graphData?.edges || []
+      );
       setExplainResult(result);
     } finally {
       setExplainLoading(false);
     }
-  }, [selectedNode, secondNode]);
+  }, [selectedNode, secondNode, graphData]);
 
   const resetView = () => {
     setSubgraphMode(null);
@@ -276,6 +287,11 @@ export default function TrustGraphPage() {
             {graphData && (
               <span className="text-xs text-[#6b6460]">
                 {nodes.length} nodes · {edges.length} edges
+                {graphData.truncated && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-medium">
+                    Capped at 100
+                  </span>
+                )}
                 {subgraphMode && <span className="ml-2 text-amber-400">· Subgraph view</span>}
               </span>
             )}

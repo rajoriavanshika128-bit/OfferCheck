@@ -1,19 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Search, BarChart3, Network, FileText, Zap, Eye, Upload, Fingerprint, GitMerge } from 'lucide-react';
 import { Navbar } from '../components/layout/Navbar';
 import { DisclaimerBox } from '../components/common/DisclaimerBox';
-import { NODE_COLORS } from '../services/graphService';
-import { reports } from '../data/reports';
-import { identifiers } from '../data/identifiers';
-import { clusters } from '../data/clusters';
-
-// Derived from actual mock data — will stay accurate as datasets grow.
-const STATS = [
-  { v: String(reports.length), l: 'Reports in database' },
-  { v: `${identifiers.length}+`, l: 'Identifiers tracked' },
-  { v: String(clusters.length), l: 'Fraud clusters' },
-  { v: String(identifiers.filter(i => i.reportIds.length >= 2).length), l: 'Shared identifiers' },
-];
+import { NODE_COLORS, getPublicStats, formatStatValue, STAT_ITEMS } from '../services/graphService';
 
 // Animated decorative SVG trust graph for hero (purely illustrative)
 function HeroGraph() {
@@ -60,12 +50,41 @@ const FEATURES = [
   { icon: Network, title: 'Trust Graph', desc: 'Visualise connections between reports, identifiers and fraud clusters with multi-hop exploration.' },
   { icon: Search, title: 'Entity Resolution', desc: 'Shared UPI IDs, phones, emails and domains are cross-referenced across all submitted reports.' },
   { icon: BarChart3, title: 'Risk Scoring', desc: 'Each offer gets a transparent score with individual factor weights and supporting evidence.' },
-  { icon: FileText, title: 'Report Database', desc: `Browse and search ${reports.length} detailed reports with full risk factor breakdowns and cluster membership.` },
-  { icon: Zap, title: 'Identifier Matching', desc: `Real-time matching against ${identifiers.length}+ known fraud identifiers spanning UPIs, phones, emails and domains.` },
+  { icon: FileText, title: 'Report Database', desc: 'Browse and search detailed verified reports with full risk factor breakdowns and cluster membership.' },
+  { icon: Zap, title: 'Identifier Matching', desc: 'Real-time matching against known fraud identifiers spanning UPIs, phones, emails and domains.' },
   { icon: Eye, title: 'Transparent Evidence', desc: 'Every risk signal shows its evidence, confidence level, and plain-language explanation.' },
 ];
 
+
+
 export default function LandingPage() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    getPublicStats()
+      .then((data) => {
+        if (isMounted) {
+          setStats(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+
+
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-[#f0ede8]">
       <Navbar />
@@ -95,22 +114,32 @@ export default function LandingPage() {
           </Link>
         </div>
         <HeroGraph />
+        <p className="text-xs text-[#6b6460] mt-3">
+          Illustrative visualization of multi-hop fraud network resolution.
+        </p>
       </section>
 
       {/* Stats bar */}
       <div className="border-y border-[#2f2f2f] bg-[#161616]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {STATS.map(({ v, l }) => (
-              <div key={l}>
-                <p className="text-2xl font-bold text-amber-400">{v}</p>
-                <p className="text-sm text-[#6b6460] mt-1">{l}</p>
-              </div>
-            ))}
+            {STAT_ITEMS.map(({ key, label }) => {
+              const val = formatStatValue(stats, key, loading, error);
+              return (
+                <div key={key}>
+                  <p className={`text-2xl font-bold ${loading ? 'text-[#6b6460] animate-pulse' : error ? 'text-[#6b6460]' : 'text-amber-400'}`}>
+                    {val}
+                  </p>
+                  <p className="text-sm text-[#6b6460] mt-1">{label}</p>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-center text-xs text-[#4a4a4a] mt-4">
-            Sample data only — figures reflect the demo dataset, not live submissions.
-          </p>
+          {error && (
+            <p className="text-center text-xs text-[#6b6460] mt-4">
+              Platform statistics are temporarily unavailable.
+            </p>
+          )}
         </div>
       </div>
 
@@ -185,10 +214,9 @@ export default function LandingPage() {
             <Shield size={16} className="text-amber-400" />
             <span className="text-sm font-medium text-[#f0ede8]">OfferCheck</span>
           </div>
-          <p className="text-xs text-[#6b6460]">Demo project — all data is fictional and illustrative only.</p>
+          <p className="text-xs text-[#6b6460]">Community-driven fraud intelligence platform.</p>
         </div>
       </footer>
     </div>
   );
 }
-
