@@ -9,6 +9,7 @@ const { Router } = require('express');
 const checkController = require('../controllers/check.controller');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { checkLimiter } = require('../middleware/rateLimiter');
 const {
   offerCheckSchema,
   offerCheckQuerySchema,
@@ -19,8 +20,8 @@ const router = Router();
 // All offer check routes require authentication
 router.use(auth);
 
-// POST /api/checks - Authenticated offer check
-router.post('/', validate(offerCheckSchema), checkController.checkOffer);
+// POST /api/checks - Authenticated offer check (with rate limiting per authenticated user)
+router.post('/', checkLimiter, validate(offerCheckSchema), checkController.checkOffer);
 
 // GET /api/checks - Authenticated user check history
 router.get('/', validate.query(offerCheckQuerySchema), checkController.getHistory);

@@ -14,12 +14,27 @@ const backendEnv = path.resolve(__dirname, '../.env');
 const envPath = fs.existsSync(rootEnv) ? rootEnv : backendEnv;
 require('dotenv').config({ path: envPath });
 
+const { isValidCorsOrigin } = require('./utils/cors');
+
 // Validate required env vars before starting — fail fast, never log values
 const REQUIRED = ['DATABASE_URL', 'IP_HASH_SECRET', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
-const missing = REQUIRED.filter(k => !process.env[k]);
+if (process.env.NODE_ENV === 'production') {
+  REQUIRED.push('CORS_ORIGIN');
+}
+
+const missing = REQUIRED.filter((k) => !process.env[k]);
 if (missing.length > 0) {
   console.error('[FATAL] Missing required environment variables:', missing.join(', '));
   process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'production') {
+  if (!isValidCorsOrigin(process.env.CORS_ORIGIN)) {
+    console.error(
+      '[FATAL] Invalid CORS_ORIGIN environment variable: must be one or more valid canonical http(s) origin URLs (no paths, queries, or trailing slashes)'
+    );
+    process.exit(1);
+  }
 }
 
 const app  = require('./app');

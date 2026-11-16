@@ -16,14 +16,31 @@ const reportRouter = require('./routes/report.routes');
 const checkRouter = require('./routes/check.routes');
 const adminRouter = require('./routes/admin.routes');
 const { errorHandler } = require('./utils/errors');
+const { resolveCorsOrigin } = require('./utils/cors');
 
 const app = express();
+
+// Trust the first reverse-proxy hop strictly in production (e.g. Render Web Service).
+// In development/test, keep proxy trust disabled so clients cannot spoof X-Forwarded-For.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+// Seamless client IP fallback for in-memory stream dispatch test harnesses (where req.socket is undefined)
+app.use((req, _res, next) => {
+  if (!req.socket) {
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = forwarded ? String(forwarded).split(',')[0].trim() : '127.0.0.1';
+    Object.defineProperty(req, 'ip', { value: ip, configurable: true });
+  }
+  next();
+});
 
 // ─── Security middleware ──────────────────────────────────────────────────────
 app.use(helmet());                // sets secure HTTP headers
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173', // Vite dev server
+  origin: resolveCorsOrigin(),
   credentials: true,
 }));
 
