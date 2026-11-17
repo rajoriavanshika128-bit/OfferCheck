@@ -120,7 +120,7 @@ export default function OfferCheckerPage() {
               <Field label="Offer Message" error={errors.offerMessage} hint="Required: paste the job or internship message, email, or offer text.">
                 <textarea value={form.offerMessage} onChange={set('offerMessage')} rows={4}
                   placeholder="Paste the offer message or description here…"
-                  className={`${inputClass(errors.offerMessage)} resize-none`} />
+                  className={`${inputClass(errors.offerMessage)} resize-y min-h-[100px]`} />
               </Field>
             </div>
           </Section>
@@ -129,13 +129,13 @@ export default function OfferCheckerPage() {
             <Field label="Additional Notes">
               <textarea value={form.additionalNotes} onChange={set('additionalNotes')} rows={3}
                 placeholder="Any other suspicious details…"
-                className={`${inputClass()} resize-none`} />
+                className={`${inputClass()} resize-y min-h-[80px]`} />
             </Field>
           </Section>
 
           <div className="flex items-center gap-2 text-xs text-[#6b6460] bg-[#161616] border border-[#2f2f2f] rounded-lg px-4 py-3">
             <Info size={13} className="text-amber-500 shrink-0" />
-            Your submission is compared against 70+ known fraud identifiers. Results are illustrative — not legal determinations.
+            Your submission is compared against verified fraud signals in our database. Results are indicators — not legal determinations.
           </div>
 
           <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full justify-center">

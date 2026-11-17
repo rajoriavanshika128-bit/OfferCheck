@@ -159,7 +159,7 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left: chart + recent checks */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-5 min-w-0">
           {/* Weekly chart */}
           <div className="rounded-xl border border-[#2f2f2f] bg-[#161616] p-5">
             <div className="flex items-center justify-between mb-5">

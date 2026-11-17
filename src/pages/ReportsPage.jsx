@@ -558,7 +558,9 @@ export default function ReportsPage() {
       </div>
 
       <p className="text-xs text-[#6b6460] mb-4">
-        Showing {filteredReports.length} of {total} reports
+        {category
+          ? `Showing ${filteredReports.length} of ${reports.length} reports on page ${page} (${total} total across categories)`
+          : `Showing ${reports.length} of ${total} reports${totalPages > 1 ? ` · Page ${page} of ${totalPages}` : ''}`}
       </p>
 
       {loading ? (
@@ -582,20 +584,45 @@ export default function ReportsPage() {
           <p className="text-[#a09890]">
             {activeTab === 'saved'
               ? 'You have not bookmarked any reports yet.'
+              : category && reports.length > 0
+              ? `No ${category} risk reports found on page ${page}. Check other pages or clear the category filter.`
               : 'No reports match your filters.'}
           </p>
-          {(search || category || statusFilter) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setCategory('');
-                setStatusFilter('');
-              }}
-              className="mt-3 text-amber-400 text-sm hover:underline cursor-pointer"
-            >
-              Clear filters
-            </button>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+            {(search || category || statusFilter) && (
+              <button
+                onClick={() => {
+                  setSearch('');
+                  setCategory('');
+                  setStatusFilter('');
+                }}
+                className="text-amber-400 text-sm hover:underline cursor-pointer"
+              >
+                Clear filters
+              </button>
+            )}
+            {totalPages > 1 && category && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={14} /> Prev
+                </Button>
+                <span className="text-xs text-[#6b6460]">Page {page} of {totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next <ChevronRight size={14} />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>

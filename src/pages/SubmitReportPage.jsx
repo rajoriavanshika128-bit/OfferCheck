@@ -7,10 +7,10 @@ import { DisclaimerBox } from '../components/common/DisclaimerBox';
 import { reportService } from '../services/reportService';
 
 // Label + input wrapper — defined at module scope to maintain stable identity
-function Field({ label, hint, error, children }) {
+function Field({ id, label, hint, error, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-[#a09890] mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-[#a09890] mb-1.5">{label}</label>
       {children}
       {hint && !error && <p className="mt-1 text-xs text-[#6b6460]">{hint}</p>}
       {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
@@ -123,7 +123,7 @@ export default function SubmitReportPage() {
         </div>
 
         <div className="mb-5">
-          <DisclaimerBox text="This is a demo platform. Submitted reports are illustrative and not persisted beyond the current session. Do not submit real personal information." />
+          <DisclaimerBox text="Submitted reports are reviewed by moderators before publication. Contact identifiers are masked to protect privacy. Do not submit passwords, banking PINs, or confidential personal credentials." />
         </div>
 
         {errors.general && (
@@ -135,11 +135,11 @@ export default function SubmitReportPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <Section title="1 · Company Information">
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Company Name *" error={errors.companyName}>
-                <input value={form.companyName} onChange={set('companyName')} placeholder="e.g. TechBridge Solutions" className={inputClass(errors.companyName)} />
+              <Field id="companyName" label="Company Name *" error={errors.companyName}>
+                <input id="companyName" value={form.companyName} onChange={set('companyName')} placeholder="e.g. TechBridge Solutions" className={inputClass(errors.companyName)} />
               </Field>
-              <Field label="Company Website / Domain" hint="e.g. techbridge-hr.in (without https://)">
-                <input value={form.domain} onChange={set('domain')} placeholder="e.g. company.in" className={inputClass()} />
+              <Field id="domain" label="Company Website / Domain" hint="e.g. techbridge-hr.in (without https://)">
+                <input id="domain" value={form.domain} onChange={set('domain')} placeholder="e.g. company.in" className={inputClass()} />
               </Field>
             </div>
           </Section>
@@ -151,39 +151,39 @@ export default function SubmitReportPage() {
               </div>
             )}
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Recruiter Name">
-                <input value={form.recruiterName} onChange={set('recruiterName')} placeholder="e.g. Rahul Sharma" className={inputClass()} />
+              <Field id="recruiterName" label="Recruiter Name">
+                <input id="recruiterName" value={form.recruiterName} onChange={set('recruiterName')} placeholder="e.g. Rahul Sharma" className={inputClass()} />
               </Field>
-              <Field label="Phone Number">
-                <input type="tel" value={form.phone} onChange={set('phone')} placeholder="e.g. 9876543210" className={inputClass()} />
+              <Field id="phone" label="Phone Number">
+                <input id="phone" type="tel" value={form.phone} onChange={set('phone')} placeholder="e.g. 9876543210" className={inputClass()} />
               </Field>
-              <Field label="Email Address" className="sm:col-span-2">
-                <input type="email" value={form.email} onChange={set('email')} placeholder="e.g. hr@company.in" className={inputClass()} />
+              <Field id="email" label="Email Address" className="sm:col-span-2">
+                <input id="email" type="email" value={form.email} onChange={set('email')} placeholder="e.g. hr@company.in" className={inputClass()} />
               </Field>
             </div>
           </Section>
 
           <Section title="3 · Offer Details">
             <div className="space-y-4">
-              <Field label="UPI ID" hint="A UPI ID significantly helps identify patterns across reports.">
-                <input value={form.upiId} onChange={set('upiId')} placeholder="e.g. payment@gpay" className={inputClass()} />
+              <Field id="upiId" label="UPI ID" hint="A UPI ID significantly helps identify patterns across reports.">
+                <input id="upiId" value={form.upiId} onChange={set('upiId')} placeholder="e.g. payment@gpay" className={inputClass()} />
               </Field>
-              <Field label="Payment Requested" hint="Describe any fee or deposit requested.">
-                <input value={form.paymentRequest} onChange={set('paymentRequest')} placeholder="e.g. ₹2,500 registration fee" className={inputClass()} />
+              <Field id="paymentRequest" label="Payment Requested" hint="Describe any fee or deposit requested.">
+                <input id="paymentRequest" value={form.paymentRequest} onChange={set('paymentRequest')} placeholder="e.g. ₹2,500 registration fee" className={inputClass()} />
               </Field>
-              <Field label="Offer Message *" hint="Paste or describe the suspicious offer or communication." error={errors.offerMessage}>
-                <textarea value={form.offerMessage} onChange={set('offerMessage')} rows={5}
+              <Field id="offerMessage" label="Offer Message *" hint="Paste or describe the suspicious offer or communication." error={errors.offerMessage}>
+                <textarea id="offerMessage" value={form.offerMessage} onChange={set('offerMessage')} rows={5}
                   placeholder="Describe the offer or paste the message you received…"
-                  className={`${inputClass(errors.offerMessage)} resize-none`} />
+                  className={`${inputClass(errors.offerMessage)} resize-y min-h-[120px]`} />
               </Field>
             </div>
           </Section>
 
           <Section title="4 · Additional Notes">
-            <Field label="Anything else to add?">
-              <textarea value={form.additionalNotes} onChange={set('additionalNotes')} rows={3}
+            <Field id="additionalNotes" label="Anything else to add?">
+              <textarea id="additionalNotes" value={form.additionalNotes} onChange={set('additionalNotes')} rows={3}
                 placeholder="Any other details that seem suspicious…"
-                className={`${inputClass()} resize-none`} />
+                className={`${inputClass()} resize-y min-h-[80px]`} />
             </Field>
           </Section>
 

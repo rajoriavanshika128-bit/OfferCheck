@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
@@ -17,8 +17,9 @@ import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <LoadingSpinner fullScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (requireAdmin && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return children;
 }

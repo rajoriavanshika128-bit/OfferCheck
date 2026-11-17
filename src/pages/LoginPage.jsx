@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
@@ -7,6 +7,7 @@ import { Button } from '../components/common/Button';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -20,7 +21,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email.trim(), password);
-      navigate(user.role === 'admin' ? '/admin' : '/dashboard');
+      const from = location.state?.from?.pathname;
+      const target = from && (user.role === 'admin' || !from.startsWith('/admin'))
+        ? `${from}${location.state.from.search || ''}${location.state.from.hash || ''}`
+        : (user.role === 'admin' ? '/admin' : '/dashboard');
+      navigate(target, { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {

@@ -255,7 +255,7 @@ export default function HowItWorksPage() {
 
             <div className="border-t border-amber-500/15 pt-4">
               <p className="text-xs text-amber-200/50 leading-relaxed">
-                OfferCheck is a demo fraud-intelligence platform. All data shown is fictional and for illustrative purposes only. No real individuals, companies or incidents are represented. This tool does not constitute legal advice. Always consult appropriate authorities if you believe you have been defrauded.
+                Risk scores and intelligence signals are indicators, not legal determinations. OfferCheck does not constitute legal advice. Always consult appropriate authorities and verify offers through official registered channels if you believe you have encountered fraud.
               </p>
             </div>
           </div>

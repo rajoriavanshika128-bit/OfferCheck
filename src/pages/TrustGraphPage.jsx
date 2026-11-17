@@ -319,9 +319,9 @@ export default function TrustGraphPage() {
         </div>
 
         {/* Main area */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* SVG Canvas */}
-          <div className="flex-1 relative overflow-hidden bg-[#0f0f0f]">
+          <div className="flex-1 relative overflow-hidden bg-[#0f0f0f] min-h-[300px]">
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <LoadingSpinner size="lg" />
@@ -444,7 +444,7 @@ export default function TrustGraphPage() {
           </div>
 
           {/* Right Panel */}
-          <div className="w-64 shrink-0 border-l border-[#2f2f2f] bg-[#161616] flex flex-col overflow-y-auto">
+          <div className="w-full md:w-64 shrink-0 border-t md:border-t-0 md:border-l border-[#2f2f2f] bg-[#161616] flex flex-col overflow-y-auto max-h-60 md:max-h-none">
             <div className="p-4 flex-1">
               {selectedNode ? (
                 <div>
