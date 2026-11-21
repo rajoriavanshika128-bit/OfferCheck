@@ -35,6 +35,12 @@ const RECOMMENDED_ACTIONS = {
   ],
 };
 
+const CONFIDENCE_LABELS = {
+  high: 'High confidence',
+  medium: 'Medium confidence',
+  low: 'Low confidence',
+};
+
 function ScoreRing({ score, category }) {
   const COLOR = { critical:'#ef4444', high:'#f97316', medium:'#eab308', low:'#22c55e' };
   const color = COLOR[category] || '#a09890';
@@ -163,7 +169,7 @@ export default function ResultsPage() {
                         ${f.confidence === 'high' ? 'bg-green-500/10 text-green-400'
                         : f.confidence === 'medium' ? 'bg-yellow-500/10 text-yellow-400'
                         : 'bg-[#232323] text-[#6b6460]'}`}>
-                        {f.confidence}
+                        {CONFIDENCE_LABELS[f.confidence?.toLowerCase()] || (f.confidence ? `${f.confidence} confidence` : '')}
                       </span>
                       <span className="text-xs text-amber-400 font-semibold">+{f.weight}pts</span>
                     </div>
